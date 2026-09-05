@@ -5,32 +5,36 @@
 
 Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-obsidian--marp--tikz-black?logo=github)](https://github.com/kevinyuan/obsidian-marp-tikz) [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Marp%20TikZ-7c3aed?logo=obsidian)](https://obsidian.md/plugins?id=marp-tikz)
 
-**Marp Plus** turns VS Code into a complete workbench for [Marp](https://marp.app/) slide decks. It sits on top of the official Marp extension and adds the pieces that are missing when you build and deliver real presentations: a slide navigator with thumbnails and outline, a live speaker notes panel, one-click export to **editable PPTX** with native math and tables, shared frontmatter and notes across decks, a preview that is always fresh after every save, and TikZ/LaTeX diagrams (circuits, plots, chemical structures, commutative diagrams) rendered right inside your slides.
+**Build presentations the way you build software.** Marp Plus turns VS Code into a workbench for [Marp](https://marp.app/) slide decks that is friendly to AI agents, precise enough for engineering content, and comfortable enough to replace PowerPoint for the whole authoring cycle.
 
-Everything also works in the plain Markdown preview, so the same diagrams and includes are usable in ordinary documents, not only in slide decks.
+- **AI-friendly.** A deck is plain text all the way down: Markdown slides, a YAML theme, TikZ diagrams and Markdown speaker notes, split into small files with `%!include`. Every piece is easy to prompt for, review, diff and version. Whatever writes to disk, you or an agent, the preview is fresh on the next save.
+- **Engineering precision.** Circuits, plots, chemical structures, commutative diagrams and any other TikZ/LaTeX figure render as vector graphics with real TeX fonts, identically in the preview and in the exported file.
+- **A professional presentation workflow.** A slide navigator with thumbnails and outline, a live speaker notes panel, and one-click export to editable PPTX (native text, math and tables) or PDF.
 
-## Main Features — what Marp Plus adds on top of the standard Marp extension
+The same diagrams and includes also work in the ordinary Markdown preview, so nothing here is limited to slides.
 
-Marp Plus works alongside the official [Marp for VS Code](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode) extension (and plain Markdown preview) and extends it with the things the standard extension does not do:
+## Main Features
 
-| Capability | Standard Marp extension | Marp Plus |
-|-----------|------------------------|-----------|
-| **TikZ / LaTeX diagrams in slides** — `tikz` code blocks rendered to crisp SVG (pgfplots, circuitikz, chemfig, tikz-cd, tikz-3dplot, …) | Not supported | Rendered live in the preview and in exports |
-| **Slide Navigator** — thumbnail sidebar with small/large/outline views, click-to-jump, ↑/↓ keyboard paging, scroll sync | Not available | Built into the preview |
-| **Speaker Notes panel** — notes from `<!-- -->` comments shown next to the current slide, rendered as full Markdown | Presenter view only in exported HTML | Live in the VS Code preview |
-| **Editable PPTX export** — real text, shapes, native tables and native math (OMML) instead of one image per slide; CJK fonts embedded | Image-per-slide PPTX | One-click export button, editable output |
-| **Includes** — `%!include` for TikZ files and shared YAML frontmatter, `%!notes` for shared speaker notes | Not available | Resolved in preview and export, watched for changes |
-| **Always-fresh preview** — saving re-renders the deck, its included files and local images; a Force Refresh command bypasses every cache | Relies on editor change events | Save-triggered refresh, image cache-busting, force refresh |
-| **Dark-mode aware diagrams** — TikZ colours inverted to match dark themes, TeX fonts embedded so text never renders as boxes | n/a | Automatic |
+### AI-friendly authoring
 
-Marp Plus does not replace the Marp extension: keep both installed. Slide layout, themes, directives and HTML/PDF export still come from Marp; Marp Plus adds the diagram engine, navigator, notes panel, includes, refresh logic and PPTX post-processing on top.
+- **Plain text end to end** — slides, theme, diagrams and notes are Markdown, YAML and TikZ. No binary files, no proprietary format, nothing an agent cannot read or write.
+- **Modular decks** — `%!include` pulls in TikZ files and shared YAML frontmatter, `%!notes` pulls in speaker notes, so every diagram, theme and script lives in its own file and can be edited independently.
+- **Always-fresh preview** — saving any file re-renders the deck, its included files and its local images. A **Force Refresh Rendering** command bypasses every cache when you want to be sure.
+- **Scriptable export** — the bundled `marp-tikz.js` CLI produces PPTX or PDF from the command line for CI jobs and agent pipelines.
 
-### What's New in 0.4.41
+### Engineering precision
 
-- **Renamed to Marp Plus** — command palette entries now live under the **Marp Plus:** category (command IDs `marpPlus.*`; settings keep the `tikzjax.*` prefix so existing configuration keeps working)
-- **Save always refreshes** — saving a Markdown file re-renders the preview even when no diagram changed; saving an included notes/theme/TikZ file refreshes the deck that includes it
-- **Image cache-busting** — local `svg`/`png`/`jpg` images are stamped with their modification time, so regenerated images show up instead of a stale cached copy
-- **Force Refresh Rendering** — new command and title-bar button that drops include caches, diagram caches and the webview image cache, then re-renders
+- **TikZ / LaTeX diagrams in slides and documents** — `tikz` code blocks render to crisp SVG: circuitikz, pgfplots, chemfig, tikz-cd, tikz-3dplot and anything else TikZ can draw.
+- **Exact typography** — the real TeX fonts are bundled and embedded, so math and symbols look the same in the preview, in PPTX and in PDF.
+- **Offline, sandboxed rendering** — a WebAssembly TeX engine runs in a separate worker process. Nothing leaves your machine, a runaway diagram is killed at the timeout, and finished diagrams are cached across workspaces.
+- **Theme-aware colours** — diagrams follow light and dark editor themes automatically.
+
+### Professional presentation experience
+
+- **Slide navigator** — a sidebar with small thumbnails, large thumbnails or an outline view; click to jump, page with ↑/↓, and stay in sync with the editor as you scroll.
+- **Speaker notes panel** — notes for the current slide shown next to the preview, rendered as full Markdown.
+- **Editable PPTX export** — real text and shapes, native PowerPoint math (OMML), native tables, embedded CJK fonts and speaker notes in the notes pane. One click from the editor or preview title bar.
+- **PDF export** — the same button, with the last used format remembered.
 
 ## Gallery
 
@@ -67,83 +71,92 @@ Marp Plus does not replace the Marp extension: keep both installed. Slide layout
 
 More TikZ diagram examples can be found in this article: [Decoding the Taalas HC1 — A Quantitative Analysis](https://kevinyuan1.substack.com/p/decoding-the-taalas-hc1-a-quantitative)
 
-## Features
-
-- **Live Preview**: See your TikZ diagrams rendered in real-time as you type
-- **Marp Compatibility**: TikZ diagrams render inside Marp slide decks (`marp: true`), export to **editable PPTX**
-- **Slide Navigator** ✦: Thumbnail sidebar with three view modes (small/large thumbnails, outline) and click-to-navigate — synced with the main slide view
-- **Speaker Notes Panel** ✦: Live speaker notes extracted from Marp HTML comments, displayed alongside the slide preview
-- **Rich Package Support**: Use chemfig, circuitikz, pgfplots, tikz-cd, and more
-- **Dark Mode**: Automatic color inversion for seamless dark theme integration
-- **External File Include**: Reference TikZ files with `%!include` — keep Markdown clean, edit diagrams separately
-- **Smart Caching**: Previously rendered diagrams load instantly
-- **Error Handling**: Clear error messages with retry options
-- **Syntax Highlighting**: LaTeX syntax highlighting in tikz code blocks
-
 ## Quick Start
 
-1. Create or open a Markdown file in VS Code
-2. Add a tikz code block:
-
-````markdown
-```tikz
-\begin{document}
-\begin{tikzpicture}
-  \draw[thick, ->] (0,0) -- (2,0) node[right] {$x$};
-  \draw[thick, ->] (0,0) -- (0,2) node[above] {$y$};
-  \draw[blue, thick] (0,0) circle (1);
-\end{tikzpicture}
-\end{document}
-```
-````
-
-3. Open the Markdown preview (`Ctrl+Shift+V` / `Cmd+Shift+V`)
-4. Your diagram appears in the preview panel!
-
-## Marp Slide Decks
-
-TikZ diagrams work inside [Marp](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode) slide decks. Add `marp: true` to your frontmatter and use tikz code blocks as usual:
+1. Install Marp Plus together with [Marp for VS Code](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode), which provides the slide layout and themes.
+2. Create a Markdown file with `marp: true` in the frontmatter and add a slide:
 
 ````markdown
 ---
 marp: true
+theme: default
 ---
 
-# My Presentation
+# Signal Path
 
 ```tikz
+\usepackage{circuitikz}
 \begin{document}
-\begin{tikzpicture}
-  \node[circle, draw] (a) at (0,0) {A};
-  \node[circle, draw] (b) at (3,0) {B};
-  \draw[->] (a) -- (b);
-\end{tikzpicture}
+\begin{circuitikz}
+  \draw (0,0) to[battery1, l=$V$] (0,3)
+        to[R=$R_1$] (3,3)
+        to[R=$R_2$] (3,0)
+        -- (0,0);
+\end{circuitikz}
 \end{document}
 ```
+
+<!-- Mention that R2 sets the output swing. -->
 ````
 
-### Diagram sizing in Marp
+3. Open the Markdown preview (`Ctrl+Shift+V` / `Cmd+Shift+V`). The diagram renders in place.
+4. Click the hamburger button in the preview to open the slide navigator, and the notes icon to show the speaker notes panel.
+5. Click the export button in the title bar to produce an editable PPTX or a PDF.
 
-Marp renders slides at a fixed 1280x720 resolution, then scales the entire slide to fit the preview pane. This means TikZ diagrams may appear smaller than in standard Markdown preview, since they occupy a smaller proportion of the 1280px-wide slide.
+TikZ blocks work the same way in a plain Markdown document without the `marp: true` line.
 
-To make diagrams larger in Marp slides, use TikZ's `scale` option:
+## Slide Navigator and Speaker Notes
 
-````markdown
-```tikz
-\begin{document}
-\begin{tikzpicture}[scale=2]
-  \draw (0,0) rectangle (3,2);
-  \node at (1.5,1) {\Large Hello!};
-\end{tikzpicture}
-\end{document}
+When previewing a Marp deck, a navigator sits inside the preview pane:
+
+- **Thumbnail sidebar**: Click the hamburger button (top-left) to open. Thumbnails stay synced with your scroll position.
+- **Three view modes**: Switch between small thumbnails, large thumbnails and outline view using the toolbar icons.
+- **Click to navigate**: Click any thumbnail or outline item to smoothly scroll to that slide.
+- **Keyboard navigation**: Press ↑/↓ anywhere in the slide preview to switch pages with smooth animation. When focus is in the sidebar, ↑/↓ moves the selection without scrolling the sidebar itself.
+- **Speaker notes panel**: Toggle it from the toolbar to see the notes for the current slide. Notes come from HTML comments in your Markdown (`<!-- Your notes here -->`) or from `%!notes` files, and are rendered as **full Markdown**: headings, bold, italic, inline code, lists, tables and links.
+- **State persistence**: Sidebar, view mode and notes panel state survive preview reloads and tab switches.
+- **Command palette**: `Marp Plus: Toggle Slide Thumbnails` toggles the sidebar; `Marp Plus: Toggle Speaker Notes Export` controls whether notes go into the exported PPTX.
+
+## Export to PPTX and PDF
+
+When a Marp file is open (`marp: true` in frontmatter), an export button appears in the title bar of both the editor and the preview. Click it and choose **PPTX**, **PPTX + Notes** or **PDF**; the last choice is remembered for next time.
+
+For PPTX the extension:
+1. Renders every TikZ diagram to SVG with its TeX fonts embedded
+2. Runs `marp-cli` with `--pptx-editable` to produce an editable `.pptx`
+3. Post-processes the file to inject native math objects and native tables, fix layout, and attach speaker notes
+4. Saves the output next to the source file (timestamped)
+
+The exported PPTX contains editable text and shapes, not one image per slide. CSS backgrounds, images and coloured slide backgrounds are preserved, and CJK text is exported with an embedded webfont so it survives the headless-browser render. The export shows progress in a notification with cancel support, and offers "Open File" / "Reveal in Finder" actions on completion.
+
+### Math Formula Support in PPTX
+
+LaTeX math formulas (`$...$` inline and `$$...$$` display) in Marp slides are converted to **native PowerPoint math objects** (OMML) — not images. This means formulas are fully editable in PowerPoint and render crisply at any zoom level.
+
+- **Display math** (`$$...$$`) is centered and automatically given sufficient vertical space
+- **Inline math** spacing with `\quad`, `\qquad` is preserved
+- **Bold/italic math** (`\mathbf`, `\mathit`) uses native PowerPoint bold/italic styling
+- **Accents** (`\hat`, `\tilde`, `\vec`, etc.) render correctly using combining diacritics
+- **N-ary operators** (`\sum`, `\prod`, `\int`, etc.) with limits render as native PowerPoint nary elements
+
+> **Prerequisites**: Install [marp-cli](https://github.com/marp-team/marp-cli) (`npm install -g @marp-team/marp-cli`) and [LibreOffice](https://www.libreoffice.org/) (required for editable PPTX conversion).
+
+### CLI Export
+
+For CI jobs and agent pipelines, the bundled `marp-tikz.js` script pre-renders the TikZ blocks and hands the deck to marp-cli:
+
+```bash
+node marp-tikz.js slides.md -- --pptx --allow-local-files --html
+node marp-tikz.js slides.md -- --pdf --allow-local-files --html
 ```
-````
 
-A `scale=2` factor generally makes diagrams appear at a similar visual size to the standard Markdown preview.
+## Modular Decks with Includes
 
-## External File Include
+A deck rarely wants to be one file. Splitting it into a theme, a set of diagrams and a set of speaker notes keeps each piece small enough to review, reuse across decks, and hand to an AI agent one at a time. All include paths resolve relative to the Markdown file being previewed, changes are picked up on save, and unchanged files are served from an mtime-checked cache.
 
-Keep your Markdown clean by storing TikZ diagrams in separate `.tikz` files. Use the `%!include` directive to reference them:
+### Diagram files
+
+Keep the deck readable by storing TikZ diagrams in separate `.tikz` files and referencing them with `%!include`:
 
 ````markdown
 ```tikz
@@ -168,16 +181,10 @@ The included file should contain complete TikZ code (with `\begin{document}` / `
 
 - **Relative paths** are resolved from the Markdown file's directory
 - **Absolute paths** are also supported
-- **Auto-refresh**: The preview updates automatically when you edit and save the included file
+- **Auto-refresh**: The preview updates automatically when the included file is saved or changes on disk
 - **Per-file caching**: Unchanged files are not re-read or re-rendered
 
-This is especially useful for AI-assisted workflows — each diagram can be maintained independently in its own file.
-
-## Frontmatter & Speaker Notes Include
-
-Use `%!include` to share YAML theme configuration and speaker notes across multiple Marp files.
-
-### Shared Frontmatter
+### Shared frontmatter
 
 Place `%!include filename.yaml` on any line inside the frontmatter block:
 
@@ -199,7 +206,7 @@ backgroundColor: white
 
 The included content is inserted in-place; keys declared before or after the directive are preserved. Multiple `%!include` lines are supported.
 
-### Shared Speaker Notes
+### Shared speaker notes
 
 Add a `%!notes filename.md` line anywhere inside a slide (not inside a comment). The extension replaces it with a proper Marp speaker notes comment before rendering, so the notes panel displays the file content as Markdown:
 
@@ -218,14 +225,21 @@ Add a `%!notes filename.md` line anywhere inside a slide (not inside a comment).
 - Audience question likely: *why not use approach X?*
 ```
 
-Both include types:
-- Resolve **relative paths** from the Markdown file's directory
-- **Auto-refresh** the preview when the included file is saved
-- Use **mtime-based caching** — unchanged files are not re-read
+## Always-Fresh Preview
 
-## Usage
+Saving a Markdown file always re-renders its preview, even if nothing changed since the last keystroke, and even if the change came from another editor or an agent writing to disk. Files the deck depends on are refreshed too:
 
-### Basic TikZ Diagram
+- Markdown, YAML and TikZ files pulled in with `%!include` or `%!notes` are re-read on save or when they change on disk.
+- Local images (`svg`, `png`, `jpg`, …) are stamped with their modification time in the preview, so a regenerated image is re-fetched instead of served from the webview's cache.
+- Rendered diagrams are content-addressed, so an unchanged diagram is never re-rendered and a changed one can never be served stale.
+
+**Marp Plus: Force Refresh Rendering** (also a refresh button in the editor and preview title bar) drops the include caches, the diagram caches and the webview image cache for the current document, then re-renders everything.
+
+## TikZ Diagrams
+
+Any fenced code block with the `tikz` language identifier is compiled by a bundled TeX engine and rendered as SVG, in Marp slides and in plain Markdown alike. The block must contain a complete document body (`\begin{document}` … `\end{document}`); `\usepackage` and `\usetikzlibrary` lines are honoured.
+
+### Basic diagram
 
 Create geometric shapes and drawings:
 
@@ -246,7 +260,7 @@ Create geometric shapes and drawings:
 ```
 ````
 
-### Graph with Nodes
+### Graph with nodes
 
 ````markdown
 ```tikz
@@ -266,11 +280,30 @@ Create geometric shapes and drawings:
 ```
 ````
 
-## Supported Packages
+### Diagram sizing in Marp slides
 
-The extension supports a wide range of LaTeX packages for specialized diagrams:
+Marp renders slides at a fixed 1280x720 resolution, then scales the entire slide to fit the preview pane. This means TikZ diagrams may appear smaller than in standard Markdown preview, since they occupy a smaller proportion of the 1280px-wide slide.
 
-### Chemistry - chemfig
+To make diagrams larger in Marp slides, use TikZ's `scale` option:
+
+````markdown
+```tikz
+\begin{document}
+\begin{tikzpicture}[scale=2]
+  \draw (0,0) rectangle (3,2);
+  \node at (1.5,1) {\Large Hello!};
+\end{tikzpicture}
+\end{document}
+```
+````
+
+A `scale=2` factor generally makes diagrams appear at a similar visual size to the standard Markdown preview.
+
+### Supported packages
+
+The engine ships with the packages needed for specialised diagrams:
+
+#### Chemistry: chemfig
 
 Draw chemical structures and molecules:
 
@@ -283,7 +316,7 @@ Draw chemical structures and molecules:
 ```
 ````
 
-### Circuits - circuitikz
+#### Circuits: circuitikz
 
 Create electronic circuit diagrams:
 
@@ -301,7 +334,7 @@ Create electronic circuit diagrams:
 ```
 ````
 
-### Plots - pgfplots
+#### Plots: pgfplots
 
 Plot mathematical functions and data:
 
@@ -325,7 +358,7 @@ Plot mathematical functions and data:
 ```
 ````
 
-### Commutative Diagrams - tikz-cd
+#### Commutative diagrams: tikz-cd
 
 Create category theory diagrams:
 
@@ -341,7 +374,7 @@ Create category theory diagrams:
 ```
 ````
 
-### 3D Diagrams - tikz-3dplot
+#### 3D figures: tikz-3dplot
 
 Draw three-dimensional figures:
 
@@ -359,11 +392,11 @@ Draw three-dimensional figures:
 ```
 ````
 
-### Mathematics - amsmath, amstext, amsfonts, amssymb
+#### Mathematics: amsmath, amstext, amsfonts, amssymb
 
 Full support for advanced mathematical notation and symbols.
 
-### Arrays - array
+#### Arrays: array
 
 Create complex array and table structures within diagrams.
 
@@ -373,23 +406,16 @@ Access these commands via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 | Command | Description |
 |---------|-------------|
-| **Marp Plus: Open Preview** | Open the preview panel to see rendered diagrams |
+| **Marp Plus: Open Preview** | Open the Markdown/Marp preview beside the editor |
 | **Marp Plus: Force Refresh Rendering** | Bypass every cache (included files, diagram results, images) and re-render the preview. Also available as a refresh button in the editor/preview title bar |
 | **Marp Plus: Refresh TikZ Diagrams** | Re-render all diagrams in the current document |
 | **Marp Plus: Clear Diagram Cache (All Workspaces)** | Clear cached diagrams and force fresh rendering |
 | **Marp Plus: Reset TikZ Engine** | Reset the rendering engine (useful after errors) |
 | **Marp Plus: Toggle Slide Thumbnails** | Show/hide the slide thumbnail sidebar in Marp preview |
-| **Marp Plus: Export Marp Slides to PPTX** | Export the current Marp deck to editable PPTX |
+| **Marp Plus: Export Marp Slides to PPTX** | Export the current Marp deck to editable PPTX or PDF |
 | **Marp Plus: Toggle Speaker Notes Export** | Toggle whether speaker notes are included in PPTX export |
 
 All commands are available when editing Markdown files.
-
-### Auto-refresh on save
-
-Saving a Markdown file always re-renders its preview, even if nothing changed since the last keystroke. Files the deck depends on are refreshed too:
-
-- Markdown/YAML/TikZ files pulled in with `%!include` or `%!notes` are re-read on save or when they change on disk.
-- Local images (`svg`, `png`, `jpg`, …) are stamped with their modification time in the preview, so a regenerated image is re-fetched instead of served from the webview's cache.
 
 ## Configuration
 
@@ -464,50 +490,6 @@ Default position for the preview panel:
 }
 ```
 
-## Marp Slide Navigator
-
-When previewing a Marp slide deck, a slide navigator appears in the preview pane:
-
-- **Thumbnail sidebar**: Click the hamburger button (top-left) to open. Thumbnails stay synced with your scroll position.
-- **Three view modes**: Switch between small thumbnails, large thumbnails, and outline view using the toolbar icons.
-- **Speaker notes**: Toggle the notes panel from the toolbar to see speaker notes for the current slide. Notes are extracted from HTML comments in your Markdown (`<!-- Your notes here -->`) and rendered as **full Markdown** — supporting bold, italic, inline code, lists, tables, headings, and links. Use **Marp Plus: Toggle Speaker Notes Export** to control whether notes are included in PPTX export.
-- **Click to navigate**: Click any thumbnail or outline item to smoothly scroll to that slide.
-- **Keyboard navigation**: Press ↑/↓ anywhere in the slide preview to switch pages with smooth animation. When focus is in the thumbnail/outline sidebar, ↑/↓ moves the selection without scrolling the sidebar itself.
-- **Command palette**: Use `Marp Plus: Toggle Slide Thumbnails` to toggle the sidebar.
-
-## Export Marp Slides to Editable PPTX
-
-For Marp slide decks containing TikZ diagrams, you can export directly to **editable PPTX** from VS Code. When a Marp file is open (`marp: true` in frontmatter), an export button appears in the editor title bar — visible in both the editor and preview modes.
-
-Click the button to:
-1. Render all TikZ diagrams to SVG
-2. Run `marp-cli` with `--pptx-editable` to produce an editable `.pptx` file
-3. Post-process the PPTX to inject native math objects and fix layout
-4. Save the output next to the source file (timestamped)
-
-The exported PPTX contains editable text and shapes — not just images. CSS backgrounds, images, and colored slide backgrounds are preserved. The export shows progress in a notification with cancel support, and offers "Open File" / "Reveal in Finder" actions on completion.
-
-### Math Formula Support in PPTX
-
-LaTeX math formulas (`$...$` inline and `$$...$$` display) in Marp slides are converted to **native PowerPoint math objects** (OMML) — not images. This means formulas are fully editable in PowerPoint and render crisply at any zoom level.
-
-- **Display math** (`$$...$$`) is centered and automatically given sufficient vertical space
-- **Inline math** spacing with `\quad`, `\qquad` is preserved
-- **Bold/italic math** (`\mathbf`, `\mathit`) uses native PowerPoint bold/italic styling
-- **Accents** (`\hat`, `\tilde`, `\vec`, etc.) render correctly using combining diacritics
-- **N-ary operators** (`\sum`, `\prod`, `\int`, etc.) with limits render as native PowerPoint nary elements
-
-> **Prerequisites**: Install [marp-cli](https://github.com/marp-team/marp-cli) (`npm install -g @marp-team/marp-cli`) and [LibreOffice](https://www.libreoffice.org/) (required for editable PPTX conversion).
-
-### CLI Export
-
-You can also export from the command line using the bundled `marp-tikz.js` script:
-
-```bash
-node marp-tikz.js slides.md -- --pptx --allow-local-files --html
-node marp-tikz.js slides.md -- --pdf --allow-local-files --html
-```
-
 ## Tips and Tricks
 
 ### Multiple Diagrams
@@ -528,12 +510,12 @@ Use the **Retry** button or **Marp Plus: Reset TikZ Engine** command to recover 
 
 - **Caching**: Rendered diagrams are cached automatically. Unchanged diagrams load instantly.
 - **Incremental Updates**: Only modified diagrams are re-rendered when you edit.
-- **Clear Cache**: Use the **Clear TikZ Cache** command if you need to force re-rendering.
+- **Clear Cache**: Use **Marp Plus: Clear Diagram Cache** if you need to force re-rendering everywhere; **Marp Plus: Force Refresh Rendering** does it for the current document only.
 
 Cached SVGs are stored as files in the extension's global storage directory
 (`<VS Code user dir>/globalStorage/kevinyuan.vscode-tikzjax/svg-cache/`), shared across
 all workspaces and capped at 2000 diagrams / 64 MB with least-recently-used eviction.
-Deleting that folder is equivalent to **Clear TikZ Cache**.
+Deleting that folder is equivalent to **Marp Plus: Clear Diagram Cache**.
 
 Diagrams are rendered in a separate worker process, so a diagram that hangs or takes
 too long cannot destabilise VS Code — it is killed at the **Render Timeout** and the
@@ -585,8 +567,8 @@ The extension automatically adjusts diagram colors for dark themes. If you prefe
 
 ### Preview not updating
 
-1. Use **TikZJax: Refresh TikZ Diagrams** to force an update
-2. Try **TikZJax: Reset TikZJax Engine** if issues persist
+1. Save the file, or run **Marp Plus: Force Refresh Rendering** (refresh button in the title bar)
+2. Try **Marp Plus: Reset TikZ Engine** if diagrams still do not update
 3. Close and reopen the preview panel
 
 ### Colors look wrong in dark mode
@@ -599,7 +581,8 @@ The extension automatically adjusts diagram colors for dark themes. If you prefe
 
 - VS Code 1.85.0 or higher
 - No internet connection required — rendering is fully offline
-- **For editable PPTX export** (optional):
+- [Marp for VS Code](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode) for slide decks (plain Markdown documents work without it)
+- **For PPTX / PDF export** (optional):
   - [marp-cli](https://github.com/marp-team/marp-cli) v4.1.0+ (`npm install -g @marp-team/marp-cli`)
   - [LibreOffice](https://www.libreoffice.org/) (used by marp-cli for ODP→PPTX conversion)
 
@@ -615,4 +598,4 @@ MIT License - see [LICENSE.md](LICENSE.md) for details.
 
 ---
 
-**Enjoy creating beautiful diagrams!** If you encounter issues or have suggestions, please [file an issue on GitHub](https://github.com/kevinyuan/vscode-tikz/issues).
+**Enjoy building your next deck!** If you encounter issues or have suggestions, please [file an issue on GitHub](https://github.com/kevinyuan/vscode-tikz/issues).
