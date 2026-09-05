@@ -13,6 +13,8 @@ Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-marp
 
 The same diagrams and includes also work in the ordinary Markdown preview, so nothing here is limited to slides.
 
+_Marp Plus is an independent third-party extension. It is not affiliated with, endorsed by, or sponsored by the Marp team._
+
 ## Main Features
 
 ### AI-friendly authoring
@@ -592,6 +594,7 @@ MIT License - see [LICENSE.md](LICENSE.md) for details.
 
 ## Acknowledgments
 
+- **[Marp](https://marp.app/)** by the Marp team - The slide ecosystem this extension builds on
 - **[node-tikzjax](https://github.com/drgrice1/node-tikzjax)** by @drgrice1 - Server-side TikZ rendering engine
 - **[obsidian-tikzjax](https://github.com/artisticat1/obsidian-tikzjax)** by @artisticat1 - Original Obsidian plugin
 - **[TikZJax](https://github.com/kisonecat/tikzjax)** by @kisonecat - Browser-based TikZ compiler
