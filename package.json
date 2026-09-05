@@ -2,7 +2,7 @@
   "name": "vscode-tikzjax",
   "displayName": "Marp Plus",
   "description": "Marp Plus: TikZ diagrams, slide navigator, speaker notes, auto-refresh and editable PPTX export for Marp/Markdown preview",
-  "version": "0.4.40",
+  "version": "0.4.41",
   "publisher": "kevinyuan",
   "icon": "icon.png",
   "author": {

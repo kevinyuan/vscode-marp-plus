@@ -9,17 +9,28 @@ Render precise and beautiful TikZ diagrams directly in your Markdown files. Crea
 
 For Marp presentations, the extension also provides a **Slide Navigator** with thumbnail sidebar and a **speaker notes panel** — features not available in the standard Marp VS Code extension.
 
-## What's New (since v0.4.0)
+## Main Features — what Marp Plus adds on top of the standard Marp extension
 
-- **Keyboard Navigation** — Press ↑/↓ anywhere in the slide preview (or in the thumbnail/outline sidebar) to switch pages with smooth animation; centering accounts for the speaker notes panel height; last slide always fully visible above the notes panel
-- **Speaker Notes Markdown** — Notes panel renders full Markdown: bold, italic, code, lists, tables, headings, links
-- **State Persistence** — Sidebar toggle, view mode, and notes panel state survive preview reloads and tab switches
-- **Frontmatter & Notes Include** — Share YAML theme settings and speaker notes across files with `%!include`
-- **External File Include** — Reference TikZ files with `%!include` directive; auto-refreshes on file changes
-- **Editable PPTX Export** — One-click export of Marp slides with native math objects (OMML), not images
-- **Slide Navigator & Speaker Notes** — Thumbnail sidebar and live speaker notes panel for Marp decks
-- **Dark Mode Text Fix** — Correct font loading and color inversion for TikZ text in dark themes
-- **Windows Compatibility** — Fixed infinite render loop caused by CRLF line endings
+Marp Plus works alongside the official [Marp for VS Code](https://marketplace.visualstudio.com/items?itemName=marp-team.marp-vscode) extension (and plain Markdown preview) and extends it with the things the standard extension does not do:
+
+| Capability | Standard Marp extension | Marp Plus |
+|-----------|------------------------|-----------|
+| **TikZ / LaTeX diagrams in slides** — `tikz` code blocks rendered to crisp SVG (pgfplots, circuitikz, chemfig, tikz-cd, tikz-3dplot, …) | Not supported | Rendered live in the preview and in exports |
+| **Slide Navigator** — thumbnail sidebar with small/large/outline views, click-to-jump, ↑/↓ keyboard paging, scroll sync | Not available | Built into the preview |
+| **Speaker Notes panel** — notes from `<!-- -->` comments shown next to the current slide, rendered as full Markdown | Presenter view only in exported HTML | Live in the VS Code preview |
+| **Editable PPTX export** — real text, shapes, native tables and native math (OMML) instead of one image per slide; CJK fonts embedded | Image-per-slide PPTX | One-click export button, editable output |
+| **Includes** — `%!include` for TikZ files and shared YAML frontmatter, `%!notes` for shared speaker notes | Not available | Resolved in preview and export, watched for changes |
+| **Always-fresh preview** — saving re-renders the deck, its included files and local images; a Force Refresh command bypasses every cache | Relies on editor change events | Save-triggered refresh, image cache-busting, force refresh |
+| **Dark-mode aware diagrams** — TikZ colours inverted to match dark themes, TeX fonts embedded so text never renders as boxes | n/a | Automatic |
+
+Marp Plus does not replace the Marp extension: keep both installed. Slide layout, themes, directives and HTML/PDF export still come from Marp; Marp Plus adds the diagram engine, navigator, notes panel, includes, refresh logic and PPTX post-processing on top.
+
+### What's New in 0.4.41
+
+- **Renamed to Marp Plus** — command palette entries now live under the **Marp Plus:** category (command IDs `marpPlus.*`; settings keep the `tikzjax.*` prefix so existing configuration keeps working)
+- **Save always refreshes** — saving a Markdown file re-renders the preview even when no diagram changed; saving an included notes/theme/TikZ file refreshes the deck that includes it
+- **Image cache-busting** — local `svg`/`png`/`jpg` images are stamped with their modification time, so regenerated images show up instead of a stale cached copy
+- **Force Refresh Rendering** — new command and title-bar button that drops include caches, diagram caches and the webview image cache, then re-renders
 
 ## Gallery
 
