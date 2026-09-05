@@ -105,7 +105,7 @@ https://marketplace.visualstudio.com/items?itemName=kevinyuan.vscode-tikzjax
 ## Current Status
 
 - ✅ Package built: `vscode-tikzjax-0.2.0.vsix`
-- ✅ Repository pushed: https://github.com/kevinyuan/vscode-tikz
+- ✅ Repository pushed: https://github.com/kevinyuan/vscode-marp-plus
 - ✅ Publisher ID updated: `kevinyuan`
 - ⏳ Marketplace publishing: **Ready to publish**
 
