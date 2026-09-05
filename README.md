@@ -1,4 +1,4 @@
-# TikZJax for VS Code
+# Marp Plus for VS Code
 
 [![VS Marketplace](https://vsmarketplacebadges.dev/installs-short/kevinyuan.vscode-tikzjax.svg?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=kevinyuan.vscode-tikzjax)
 [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/kevinyuan/vscode-tikzjax?label=Open%20VSX&logo=vscodium)](https://open-vsx.org/extension/kevinyuan/vscode-tikzjax)
@@ -362,15 +362,23 @@ Access these commands via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`):
 
 | Command | Description |
 |---------|-------------|
-| **TikZ: Open TikZ Preview** | Open the preview panel to see rendered diagrams |
-| **TikZ: Refresh TikZ Diagrams** | Re-render all diagrams in the current document |
-| **TikZ: Clear TikZ Cache** | Clear cached diagrams and force fresh rendering |
-| **TikZ: Reset TikZJax Engine** | Reset the rendering engine (useful after errors) |
-| **TikZ: Toggle Slide Thumbnails** | Show/hide the slide thumbnail sidebar in Marp preview |
-| **TikZ: Export Marp Slides to PPTX** | Export the current Marp deck to editable PPTX |
-| **TikZ: Toggle Speaker Notes Export** | Toggle whether speaker notes are included in PPTX export |
+| **Marp Plus: Open Preview** | Open the preview panel to see rendered diagrams |
+| **Marp Plus: Force Refresh Rendering** | Bypass every cache (included files, diagram results, images) and re-render the preview. Also available as a refresh button in the editor/preview title bar |
+| **Marp Plus: Refresh TikZ Diagrams** | Re-render all diagrams in the current document |
+| **Marp Plus: Clear Diagram Cache (All Workspaces)** | Clear cached diagrams and force fresh rendering |
+| **Marp Plus: Reset TikZ Engine** | Reset the rendering engine (useful after errors) |
+| **Marp Plus: Toggle Slide Thumbnails** | Show/hide the slide thumbnail sidebar in Marp preview |
+| **Marp Plus: Export Marp Slides to PPTX** | Export the current Marp deck to editable PPTX |
+| **Marp Plus: Toggle Speaker Notes Export** | Toggle whether speaker notes are included in PPTX export |
 
 All commands are available when editing Markdown files.
+
+### Auto-refresh on save
+
+Saving a Markdown file always re-renders its preview, even if nothing changed since the last keystroke. Files the deck depends on are refreshed too:
+
+- Markdown/YAML/TikZ files pulled in with `%!include` or `%!notes` are re-read on save or when they change on disk.
+- Local images (`svg`, `png`, `jpg`, …) are stamped with their modification time in the preview, so a regenerated image is re-fetched instead of served from the webview's cache.
 
 ## Configuration
 
@@ -381,7 +389,7 @@ Customize the extension behavior through VS Code settings:
 **Type:** `boolean`
 **Default:** `true`
 
-Include speaker notes (HTML comments `<!-- ... -->`) when exporting Marp slides to PPTX. When enabled, notes appear in the PowerPoint notes pane for each slide. Toggle quickly with the **TikZ: Toggle Speaker Notes Export** command.
+Include speaker notes (HTML comments `<!-- ... -->`) when exporting Marp slides to PPTX. When enabled, notes appear in the PowerPoint notes pane for each slide. Toggle quickly with the **Marp Plus: Toggle Speaker Notes Export** command.
 
 ```json
 {
@@ -451,10 +459,10 @@ When previewing a Marp slide deck, a slide navigator appears in the preview pane
 
 - **Thumbnail sidebar**: Click the hamburger button (top-left) to open. Thumbnails stay synced with your scroll position.
 - **Three view modes**: Switch between small thumbnails, large thumbnails, and outline view using the toolbar icons.
-- **Speaker notes**: Toggle the notes panel from the toolbar to see speaker notes for the current slide. Notes are extracted from HTML comments in your Markdown (`<!-- Your notes here -->`) and rendered as **full Markdown** — supporting bold, italic, inline code, lists, tables, headings, and links. Use **TikZ: Toggle Speaker Notes Export** to control whether notes are included in PPTX export.
+- **Speaker notes**: Toggle the notes panel from the toolbar to see speaker notes for the current slide. Notes are extracted from HTML comments in your Markdown (`<!-- Your notes here -->`) and rendered as **full Markdown** — supporting bold, italic, inline code, lists, tables, headings, and links. Use **Marp Plus: Toggle Speaker Notes Export** to control whether notes are included in PPTX export.
 - **Click to navigate**: Click any thumbnail or outline item to smoothly scroll to that slide.
 - **Keyboard navigation**: Press ↑/↓ anywhere in the slide preview to switch pages with smooth animation. When focus is in the thumbnail/outline sidebar, ↑/↓ moves the selection without scrolling the sidebar itself.
-- **Command palette**: Use `TikZ: Toggle Slide Thumbnails` to toggle the sidebar.
+- **Command palette**: Use `Marp Plus: Toggle Slide Thumbnails` to toggle the sidebar.
 
 ## Export Marp Slides to Editable PPTX
 
@@ -503,7 +511,7 @@ If a diagram fails to render, the extension displays an error message inline. Co
 - **Missing packages**: Ensure you've included the correct `\usepackage{}` statement
 - **Timeout**: Increase `tikzjax.renderTimeout` for complex diagrams
 
-Use the **Retry** button or **Reset TikZJax Engine** command to recover from errors.
+Use the **Retry** button or **Marp Plus: Reset TikZ Engine** command to recover from errors.
 
 ### Performance
 

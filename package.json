@@ -1,7 +1,7 @@
 {
   "name": "vscode-tikzjax",
-  "displayName": "TikZ in Markdown",
-  "description": "Render TikZ diagrams in Markdown/Marp live preview and export editable PPTX",
+  "displayName": "Marp Plus",
+  "description": "Marp Plus: TikZ diagrams, slide navigator, speaker notes, auto-refresh and editable PPTX export for Marp/Markdown preview",
   "version": "0.4.40",
   "publisher": "kevinyuan",
   "icon": "icon.png",
@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/kevinyuan/vscode-tikz#readme",
   "keywords": [
+    "marp plus",
     "tikz",
     "latex",
     "markdown",
@@ -73,77 +74,98 @@
     ],
     "commands": [
       {
-        "command": "tikz.openPreview",
-        "title": "Open TikZ Preview",
-        "category": "TikZ",
+        "command": "marpPlus.openPreview",
+        "title": "Open Preview",
+        "category": "Marp Plus",
         "when": "editorLangId == markdown"
       },
       {
-        "command": "tikz.refreshDiagrams",
+        "command": "marpPlus.forceRefresh",
+        "title": "Force Refresh Rendering",
+        "category": "Marp Plus",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "marpPlus.refreshDiagrams",
         "title": "Refresh TikZ Diagrams",
-        "category": "TikZ",
+        "category": "Marp Plus",
         "when": "editorLangId == markdown"
       },
       {
-        "command": "tikz.clearCache",
-        "title": "Clear TikZ Cache (All Workspaces)",
-        "category": "TikZ",
+        "command": "marpPlus.clearCache",
+        "title": "Clear Diagram Cache (All Workspaces)",
+        "category": "Marp Plus",
         "when": "editorLangId == markdown"
       },
       {
-        "command": "tikz.resetEngine",
-        "title": "Reset TikZJax Engine",
-        "category": "TikZ",
+        "command": "marpPlus.resetEngine",
+        "title": "Reset TikZ Engine",
+        "category": "Marp Plus",
         "when": "editorLangId == markdown"
       },
       {
-        "command": "tikz.exportMarpPptx",
+        "command": "marpPlus.exportMarpPptx",
         "title": "Export Marp Slides to PPTX",
-        "category": "TikZ",
+        "category": "Marp Plus",
         "icon": "$(desktop-download)"
       },
       {
-        "command": "tikz.toggleThumbnails",
+        "command": "marpPlus.toggleThumbnails",
         "title": "Toggle Slide Thumbnails",
-        "category": "TikZ",
+        "category": "Marp Plus",
         "when": "editorLangId == markdown"
       },
       {
-        "command": "tikz.toggleMarpPptxNotes",
+        "command": "marpPlus.toggleMarpPptxNotes",
         "title": "Toggle Speaker Notes Export",
-        "category": "TikZ"
+        "category": "Marp Plus"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "tikz.exportMarpPptx",
+          "command": "marpPlus.forceRefresh",
           "group": "navigation",
-          "when": "editorLangId == markdown && tikz.isMarpFile"
+          "when": "editorLangId == markdown"
         },
         {
-          "command": "tikz.exportMarpPptx",
+          "command": "marpPlus.forceRefresh",
           "group": "navigation",
-          "when": "activeWebviewPanelId == 'markdown.preview' && tikz.isMarpFile"
+          "when": "activeWebviewPanelId == 'markdown.preview'"
         },
         {
-          "command": "tikz.exportMarpPptx",
+          "command": "marpPlus.forceRefresh",
           "group": "navigation",
-          "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && tikz.isMarpFile"
+          "when": "activeCustomEditorId == 'vscode.markdown.preview.editor'"
+        },
+        {
+          "command": "marpPlus.exportMarpPptx",
+          "group": "navigation",
+          "when": "editorLangId == markdown && marpPlus.isMarpFile"
+        },
+        {
+          "command": "marpPlus.exportMarpPptx",
+          "group": "navigation",
+          "when": "activeWebviewPanelId == 'markdown.preview' && marpPlus.isMarpFile"
+        },
+        {
+          "command": "marpPlus.exportMarpPptx",
+          "group": "navigation",
+          "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && marpPlus.isMarpFile"
         }
       ]
     },
     "views": {
       "explorer": [
         {
-          "id": "tikzMarpSlides",
+          "id": "marpPlusSlides",
           "name": "Marp Slides",
-          "when": "tikz.isMarpFile"
+          "when": "marpPlus.isMarpFile"
         }
       ]
     },
     "configuration": {
-      "title": "TikZ in Markdown",
+      "title": "Marp Plus",
       "properties": {
         "tikzjax.invertColorsInDarkMode": {
           "type": "boolean",

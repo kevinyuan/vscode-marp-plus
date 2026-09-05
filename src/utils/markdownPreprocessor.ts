@@ -49,6 +49,11 @@ export class MarkdownIncludeResolver {
         this._cache.delete(filePath);
     }
 
+    /** Evict every entry so the next resolve re-reads all included files. */
+    clearCache(): void {
+        this._cache.clear();
+    }
+
     // ── Core ────────────────────────────────────────────────────
 
     /**

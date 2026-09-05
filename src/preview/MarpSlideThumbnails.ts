@@ -34,7 +34,7 @@ export class MarpSlideThumbnails implements vscode.WebviewViewProvider {
 
         webviewView.webview.onDidReceiveMessage(msg => {
             if (msg.type === 'goToSlide') {
-                vscode.commands.executeCommand('tikzjax.goToSlide', msg.line);
+                vscode.commands.executeCommand('marpPlus.goToSlide', msg.line);
             }
         });
 

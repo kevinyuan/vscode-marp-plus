@@ -15,7 +15,7 @@ class SlideItem extends vscode.TreeItem {
         this.description = slide.cssClass || undefined;
         this.tooltip = `Slide ${slide.index}: ${slide.heading}`;
         this.command = {
-            command: 'tikzjax.goToSlide',
+            command: 'marpPlus.goToSlide',
             title: 'Go to Slide',
             arguments: [slide.line]
         };

@@ -13,6 +13,7 @@ import { extractAndReplaceMath, ExtractedMath } from './utils/mathPreprocessor';
 import { latexToOmml } from './utils/mathToOmml';
 import { injectMarpCjkFont } from './utils/marpCjkFont';
 import { MarkdownIncludeResolver } from './utils/markdownPreprocessor';
+import { bustImageCache, collectLocalImagePaths } from './utils/imageCacheBuster';
 import { installParseWrapper } from './utils/parseWrapper';
 import { embedTexFonts } from './utils/texFonts';
 
@@ -135,9 +136,9 @@ function parseSpeakerNotes(markdown: string): string[] {
 
 
 export function activate(context: vscode.ExtensionContext) {
-  outputChannel = vscode.window.createOutputChannel('TikZJax');
+  outputChannel = vscode.window.createOutputChannel('Marp Plus');
   extensionContext = context;
-  outputChannel.appendLine('TikZJax extension activating...');
+  outputChannel.appendLine('Marp Plus extension activating...');
 
   documentParser = new DocumentParser();
 
@@ -172,10 +173,10 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Marp slide navigator
   const slideNavigator = new MarpSlideNavigator();
-  vscode.window.registerTreeDataProvider('tikzMarpSlides', slideNavigator);
+  vscode.window.registerTreeDataProvider('marpPlusSlides', slideNavigator);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('tikz.toggleThumbnails', async () => {
+    vscode.commands.registerCommand('marpPlus.toggleThumbnails', async () => {
       thumbPanelVisible = !thumbPanelVisible;
       thumbToggleSeq++;
       outputChannel.appendLine(`[toggle] visible=${thumbPanelVisible} seq=${thumbToggleSeq}`);
@@ -184,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('tikzjax.goToSlide', async (line: number) => {
+    vscode.commands.registerCommand('marpPlus.goToSlide', async (line: number) => {
       const doc = lastMarkdownDocument || vscode.window.visibleTextEditors.find(
         e => e.document.languageId === 'markdown'
       )?.document;
@@ -221,7 +222,7 @@ export function activate(context: vscode.ExtensionContext) {
     lastMarkdownDocument = vscode.window.activeTextEditor.document;
   }
 
-  outputChannel.appendLine('TikZJax extension activated');
+  outputChannel.appendLine('Marp Plus extension activated');
 
   /**
    * Shared rendering logic — returns HTML for a TikZ source string.
@@ -391,8 +392,12 @@ export function activate(context: vscode.ExtensionContext) {
         }
         const baseDir = path.dirname(doc.uri.fsPath);
         markdownIncludeResolver.clearTracked();
-        const resolved = markdownIncludeResolver.resolve(src, baseDir);
+        let resolved = markdownIncludeResolver.resolve(src, baseDir);
         if (resolved !== src) { warnIfIncludeBreaksMarpTheme(src); }
+        // Stamp local images (svg/png/…) with their mtime so the webview re-fetches
+        // them after they change on disk instead of painting a cached copy.
+        trackedImagePaths = collectLocalImagePaths(resolved, baseDir);
+        resolved = bustImageCache(resolved, baseDir);
         prepareRender(resolved);
         // Update file watchers after parse completes (deferred to avoid re-entrancy)
         setTimeout(updateIncludeFileWatcher, 0);
@@ -609,22 +614,66 @@ function scheduleBackgroundRender(): void {
   }, 50);
 }
 
-// ── Watch external tikz files referenced by %!include ──
+// ── Watch external files the preview depends on: %!include'd tikz/md/yaml and local images ──
 let includeFileWatchers: fs.FSWatcher[] = [];
 let watchedIncludePaths = new Set<string>();
 let includeWatchDebounce: NodeJS.Timeout | undefined;
+
+/** Local image files referenced by the last previewed source (absolute paths). */
+let trackedImagePaths = new Set<string>();
+
+/** Drop every cached include so the next parse re-reads them from disk. */
+function invalidateIncludeCaches(): void {
+  documentParser?.includeResolver.clearCache();
+  markdownIncludeResolver.clearCache();
+}
+
+/**
+ * A file the preview depends on (included md/tikz/yaml or a local image) changed.
+ * Re-render the previewed document's diagrams and force the preview to re-parse,
+ * even when no TikZ output changed — an image or notes edit is invisible to the
+ * diagram cache.
+ */
+function onDependencyChanged(filePath: string, reason: string): void {
+  outputChannel.appendLine(`[dep-change] ${reason}: ${filePath}`);
+  documentParser?.includeResolver.invalidate(filePath);
+  markdownIncludeResolver.invalidate(filePath);
+  if (includeWatchDebounce) { clearTimeout(includeWatchDebounce); }
+  includeWatchDebounce = setTimeout(() => {
+    includeWatchDebounce = undefined;
+    void refreshPreviewedDocument('dep-change');
+  }, 300);
+}
+
+/**
+ * Re-render the previewed document's TikZ blocks and force a preview refresh.
+ * Diagram results are content-addressed, so unchanged blocks stay cached; the
+ * refresh itself is unconditional so included text and images are re-read.
+ */
+async function refreshPreviewedDocument(reason: string, doc?: vscode.TextDocument): Promise<void> {
+  const target = doc ?? findMarkdownDocument();
+  if (!target || !previewManager) { return; }
+  outputChannel.appendLine(`[${reason}] Rendering ${target.fileName}`);
+  try {
+    await previewManager.renderDocument(target);
+  } catch (err: any) {
+    outputChannel.appendLine(`[${reason}] Render failed: ${err?.message}`);
+  }
+  updateIncludeFileWatcher();
+  previewManager.refreshPreview();
+}
 
 function updateIncludeFileWatcher(): void {
   if (!documentParser) { return; }
   const doc = findMarkdownDocument();
   if (!doc) { return; }
 
-  // Merge tikz %!include paths and markdown (frontmatter/notes) %!include paths
+  // Merge tikz %!include paths, markdown (frontmatter/notes) %!include paths, and local images
   const tikzPaths = documentParser.getIncludedFiles(doc.uri.toString());
   const mdPaths = markdownIncludeResolver.getTrackedPaths();
-  const currentPaths = new Set([...tikzPaths, ...mdPaths]);
+  const currentPaths = new Set([...tikzPaths, ...mdPaths, ...trackedImagePaths]);
 
-  outputChannel.appendLine(`[include-watch] update: ${currentPaths.size} included file(s)`);
+  outputChannel.appendLine(`[include-watch] update: ${currentPaths.size} dependent file(s)`);
   // Skip if the set of watched paths hasn't changed
   if (currentPaths.size === watchedIncludePaths.size &&
       [...currentPaths].every(p => watchedIncludePaths.has(p))) {
@@ -638,20 +687,8 @@ function updateIncludeFileWatcher(): void {
 
   for (const filePath of currentPaths) {
     try {
-      const watcher = fs.watch(filePath, () => {
-        outputChannel.appendLine(`[include-watch] File changed: ${filePath}`);
-        documentParser!.includeResolver.invalidate(filePath);
-        markdownIncludeResolver.invalidate(filePath);
-        // Debounce rapid changes (e.g. editor save writes multiple events)
-        if (includeWatchDebounce) { clearTimeout(includeWatchDebounce); }
-        includeWatchDebounce = setTimeout(() => {
-          includeWatchDebounce = undefined;
-          const mdDoc = findMarkdownDocument();
-          if (mdDoc && previewManager) {
-            previewManager.renderDocument(mdDoc).catch(() => undefined);
-          }
-        }, 300);
-      });
+      // Debounced inside onDependencyChanged (editor saves emit several events).
+      const watcher = fs.watch(filePath, () => onDependencyChanged(filePath, 'fs.watch'));
       includeFileWatchers.push(watcher);
       outputChannel.appendLine(`[include-watch] Watching: ${filePath}`);
     } catch (err: any) {
@@ -684,17 +721,36 @@ function escapeHtml(text: string): string {
 
 function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('tikz.openPreview', async () => {
+    vscode.commands.registerCommand('marpPlus.openPreview', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { vscode.window.showWarningMessage('No active editor found'); return; }
       if (editor.document.languageId !== 'markdown') {
-        vscode.window.showWarningMessage('TikZ preview is only available for Markdown files'); return;
+        vscode.window.showWarningMessage('Marp Plus preview is only available for Markdown files'); return;
       }
       if (!previewManager) { return; }
       await previewManager.createOrShowPreview(editor.document);
     }),
 
-    vscode.commands.registerCommand('tikz.refreshDiagrams', async () => {
+    vscode.commands.registerCommand('marpPlus.forceRefresh', async () => {
+      const doc = findMarkdownDocument();
+      if (!doc || !previewManager || !cacheManager || !documentParser) {
+        vscode.window.showWarningMessage('Open a Markdown file to refresh its preview.');
+        return;
+      }
+      // Bypass every cache layer: included files, in-memory + persistent diagram
+      // results for this document, and the webview's image cache (via mtime stamps
+      // on the next parse). Then re-render and force the preview to re-parse.
+      invalidateIncludeCaches();
+      const blocks = documentParser.parse(doc);
+      for (const block of blocks) { await cacheManager.invalidate(block.hash); }
+      previewManager.clearMemoryCache();
+      await refreshPreviewedDocument('force-refresh', doc);
+      vscode.window.setStatusBarMessage(
+        `$(refresh) Marp Plus: preview refreshed (${blocks.length} diagram(s) re-rendered)`, 3000
+      );
+    }),
+
+    vscode.commands.registerCommand('marpPlus.refreshDiagrams', async () => {
       const doc = findMarkdownDocument();
       if (!doc || !previewManager || !cacheManager || !documentParser) { return; }
       const blocks = documentParser.parse(doc);
@@ -704,7 +760,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
       vscode.window.setStatusBarMessage(`$(sync) Refreshed ${blocks.length} TikZ diagram(s)`, 3000);
     }),
 
-    vscode.commands.registerCommand('tikz.clearCache', async () => {
+    vscode.commands.registerCommand('marpPlus.clearCache', async () => {
       if (!cacheManager) { return; }
       const stats = await cacheManager.getStats();
       await cacheManager.clear();
@@ -716,13 +772,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
       if (doc && previewManager) { await previewManager.renderDocument(doc); }
     }),
 
-    vscode.commands.registerCommand('tikz.resetEngine', async () => {
+    vscode.commands.registerCommand('marpPlus.resetEngine', async () => {
       if (!previewManager) { return; }
       await previewManager.resetEngine();
       vscode.window.setStatusBarMessage('$(debug-restart) TikZJax engine reset', 3000);
     }),
 
-    vscode.commands.registerCommand('tikz.exportMarpPptx', async () => {
+    vscode.commands.registerCommand('marpPlus.exportMarpPptx', async () => {
       const editor = vscode.window.activeTextEditor;
       const doc = (editor && editor.document.languageId === 'markdown')
         ? editor.document
@@ -734,7 +790,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
       await exportMarpPptx(doc);
     }),
 
-    vscode.commands.registerCommand('tikz.toggleMarpPptxNotes', async () => {
+    vscode.commands.registerCommand('marpPlus.toggleMarpPptxNotes', async () => {
       const config = vscode.workspace.getConfiguration('tikzjax');
       const current = config.get<boolean>('marpPptxNotes', true);
       await config.update('marpPptxNotes', !current, vscode.ConfigurationTarget.Global);
@@ -753,12 +809,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
 function updateMarpContext(doc: vscode.TextDocument | undefined): void {
   if (!doc) { return; } // Keep last state when switching to webview/preview
   if (doc.languageId !== 'markdown') {
-    vscode.commands.executeCommand('setContext', 'tikz.isMarpFile', false);
+    vscode.commands.executeCommand('setContext', 'marpPlus.isMarpFile', false);
     return;
   }
   const head = doc.getText().slice(0, 500);
   const isMarp = /^---[\s\S]*?marp:\s*true/m.test(head);
-  vscode.commands.executeCommand('setContext', 'tikz.isMarpFile', isMarp);
+  vscode.commands.executeCommand('setContext', 'marpPlus.isMarpFile', isMarp);
 
   // Marp is optional; only mention it once the user opens something that needs it.
   if (isMarp) { notifyIfMarpExtensionMissing(); }
@@ -837,14 +893,29 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
     // Also refresh on save: onDidChangeTextDocument fires for typed changes but NOT for
     // saves where content is already up-to-date (e.g. manual Cmd+S without new edits,
     // or format-on-save that leaves content identical).
+    // Saving must always produce a fresh preview: the saved file may be the deck
+    // itself, an included notes/theme/tikz file, or the deck was saved unchanged
+    // (Cmd+S with no edits, format-on-save) — none of which are guaranteed to
+    // fire onDidChangeTextDocument or to change any diagram hash.
     vscode.workspace.onDidSaveTextDocument((doc) => {
-      if (doc.languageId !== 'markdown' || !previewManager) { return; }
+      if (!previewManager) { return; }
+      const savedPath = doc.uri.fsPath;
+
+      // A dependency of the previewed deck (included md/yaml/tikz, or an image
+      // opened as text) — refresh the deck, not the dependency.
+      const previewed = findMarkdownDocument();
+      if (previewed && previewed.uri.toString() !== doc.uri.toString() && watchedIncludePaths.has(savedPath)) {
+        onDependencyChanged(savedPath, 'doc-save');
+        return;
+      }
+
+      if (doc.languageId !== 'markdown') { return; }
       lastMarkdownDocument = doc;
       updateMarpContext(doc);
-      // Only trigger if no debounce is already pending (avoid double render after typing+save)
-      if (debounceTimer) { return; }
-      outputChannel.appendLine(`[doc-save] Rendering blocks for ${doc.fileName}`);
-      previewManager!.renderDocument(doc).then(() => updateIncludeFileWatcher()).catch(() => undefined);
+      // Supersede any pending typing debounce so the save renders exactly once, now.
+      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = undefined; }
+      invalidateIncludeCaches();
+      void refreshPreviewedDocument('doc-save', doc);
     })
   );
 

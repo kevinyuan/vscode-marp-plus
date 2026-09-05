@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-VS Code extension ("TikZ in Markdown") that renders TikZ/LaTeX diagrams inside VS Code's built-in Markdown preview. Users write fenced `tikz` code blocks in Markdown; the extension renders them to SVG via `node-tikzjax` (WASM-based TeX engine) and injects inline SVGs into the preview.
+VS Code extension ("Marp Plus", marketplace id `kevinyuan.vscode-tikzjax`) that renders TikZ/LaTeX diagrams inside VS Code's built-in Markdown preview. Users write fenced `tikz` code blocks in Markdown; the extension renders them to SVG via `node-tikzjax` (WASM-based TeX engine) and injects inline SVGs into the preview.
 
 ## Commands
 
@@ -45,7 +45,7 @@ Tests are co-located (`*.test.ts` next to source). All run in Node via `ts-jest`
 
 ### Extension Settings
 
-Settings live under `tikzjax.*`: `invertColorsInDarkMode`, `renderTimeout`, `autoPreview`, `previewPosition`.
+Settings live under `tikzjax.*` (kept for backward compatibility after the rename to Marp Plus; command IDs are `marpPlus.*`): `invertColorsInDarkMode`, `renderTimeout`, `autoPreview`, `previewPosition`.
 
 ## Key Constraints
 

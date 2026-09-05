@@ -95,7 +95,7 @@ export class PreviewManager {
         this._cacheManager = cacheManager;
         this._config = config;
         this._texFontDir = path.join(extensionUri.fsPath, 'media', 'tex-fonts', 'ttf');
-        this._outputChannel = vscode.window.createOutputChannel('TikZJax Renderer');
+        this._outputChannel = vscode.window.createOutputChannel('Marp Plus Renderer');
         this._renderer = new TikzRenderer((msg) => this._outputChannel.appendLine(msg));
     }
 
