@@ -252,11 +252,17 @@
             '#marp-notes-content { line-height: 1.6; }',
             '#marp-notes-content p { margin: 0 0 0.5em; }',
             '#marp-notes-content p:last-child { margin-bottom: 0; }',
-            '#marp-notes-content h1, #marp-notes-content h2, #marp-notes-content h3 {',
+            '#marp-notes-content h1, #marp-notes-content h2, #marp-notes-content h3,',
+            '#marp-notes-content h4, #marp-notes-content h5, #marp-notes-content h6 {',
             '  margin: 0.6em 0 0.3em; font-size: 1em; font-weight: bold;',
             '}',
             '#marp-notes-content h1 { font-size: 1.15em; }',
             '#marp-notes-content h2 { font-size: 1.07em; }',
+            '#marp-notes-content h4, #marp-notes-content h5, #marp-notes-content h6 {',
+            '  font-size: 0.95em; opacity: 0.85;',
+            '}',
+            '#marp-notes-content h1:first-child, #marp-notes-content h2:first-child,',
+            '#marp-notes-content h3:first-child, #marp-notes-content h4:first-child { margin-top: 0; }',
             '#marp-notes-content code {',
             '  font-family: var(--vscode-editor-font-family, monospace);',
             '  background: var(--vscode-textCodeBlock-background, rgba(128,128,128,0.2));',
@@ -838,7 +844,7 @@
                 i++;
                 continue;
             }
-            var hm = line.match(/^(#{1,3})\s+(.*)/);
+            var hm = line.match(/^(#{1,6})\s+(.*)/);
             if (hm) {
                 para = flushPara(para);
                 var level = hm[1].length;
