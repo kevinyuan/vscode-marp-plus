@@ -5,9 +5,9 @@
 
 Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-obsidian--marp--tikz-black?logo=github)](https://github.com/kevinyuan/obsidian-marp-tikz) [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Marp%20TikZ-7c3aed?logo=obsidian)](https://obsidian.md/plugins?id=marp-tikz)
 
-Render precise and beautiful TikZ diagrams directly in your Markdown files. Create mathematical diagrams, circuit schematics, chemical structures, commutative diagrams, and more — all with live preview. Works with both standard Markdown preview and [Marp](https://marp.app/) slide decks, with one-click export to **editable PPTX**.
+**Marp Plus** turns VS Code into a complete workbench for [Marp](https://marp.app/) slide decks. It sits on top of the official Marp extension and adds the pieces that are missing when you build and deliver real presentations: a slide navigator with thumbnails and outline, a live speaker notes panel, one-click export to **editable PPTX** with native math and tables, shared frontmatter and notes across decks, a preview that is always fresh after every save, and TikZ/LaTeX diagrams (circuits, plots, chemical structures, commutative diagrams) rendered right inside your slides.
 
-For Marp presentations, the extension also provides a **Slide Navigator** with thumbnail sidebar and a **speaker notes panel** — features not available in the standard Marp VS Code extension.
+Everything also works in the plain Markdown preview, so the same diagrams and includes are usable in ordinary documents, not only in slide decks.
 
 ## Main Features — what Marp Plus adds on top of the standard Marp extension
 
