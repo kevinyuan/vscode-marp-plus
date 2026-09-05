@@ -225,6 +225,31 @@ export function activate(context: vscode.ExtensionContext) {
   outputChannel.appendLine('Marp Plus extension activated');
 
   /**
+   * Hidden elements that carry preview-side state (speaker notes, slide line
+   * numbers, thumbnail toggle) into the webview, where marp-thumbnails.js reads
+   * them. Notes and line numbers are emitted once per render cycle; the flags
+   * are reset by prepareRender before every parse.
+   */
+  function buildSignalHtml(): string {
+    let signalHtml = '';
+    if (thumbToggleSeq > 0) {
+      signalHtml += `<div data-marp-thumb-toggle="${thumbToggleSeq}" data-marp-thumb-visible="${thumbPanelVisible}" style="display:none"></div>`;
+    }
+    if (!notesInjected && cachedSlideNotes.length > 0) {
+      notesInjected = true;
+      const notesJson = JSON.stringify(cachedSlideNotes).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+      signalHtml += `<div data-marp-slide-notes='${notesJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
+    }
+    // Slide line numbers enable preview→editor scroll sync.
+    if (!slideLinesInjected && cachedSlideLines.length > 1) {
+      slideLinesInjected = true;
+      const linesJson = JSON.stringify(cachedSlideLines).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+      signalHtml += `<div data-marp-slide-lines='${linesJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
+    }
+    return signalHtml;
+  }
+
+  /**
    * Shared rendering logic — returns HTML for a TikZ source string.
    * Resolves %!include directives before rendering.
    * Includes inline style fallbacks so output works inside Marp (which strips external CSS).
@@ -261,23 +286,10 @@ export function activate(context: vscode.ExtensionContext) {
     const result = previewManager?.getOrLoadSync(hash);
     outputChannel.appendLine(`[render] content length=${source.length} trimmed length=${source.trim().length} hash=${hash.slice(0, 8)}`);
 
-    // Piggyback signals on tikz fence output (raw HTML, bypasses Marp's html sanitization)
-    let signalHtml = '';
-    if (thumbToggleSeq > 0) {
-      signalHtml += `<div data-marp-thumb-toggle="${thumbToggleSeq}" data-marp-thumb-visible="${thumbPanelVisible}" style="display:none"></div>`;
-    }
-    // Inject speaker notes data once per render cycle
-    if (!notesInjected && cachedSlideNotes.length > 0) {
-      notesInjected = true;
-      const notesJson = JSON.stringify(cachedSlideNotes).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
-      signalHtml += `<div data-marp-slide-notes='${notesJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
-    }
-    // Inject slide line numbers once per render cycle (enables preview→editor scroll sync)
-    if (!slideLinesInjected && cachedSlideLines.length > 1) {
-      slideLinesInjected = true;
-      const linesJson = JSON.stringify(cachedSlideLines).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
-      signalHtml += `<div data-marp-slide-lines='${linesJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
-    }
+    // Signals ride along with fence output (raw HTML, bypasses Marp's html
+    // sanitization). Decks without any tikz block get them appended to the
+    // whole render instead — see installFenceOnMarpInstance.
+    const signalHtml = buildSignalHtml();
 
     if (result?.svgImg) {
       // Self-contained data-URI <img>: an SVG loaded as an image is an isolated
@@ -369,6 +381,20 @@ export function activate(context: vscode.ExtensionContext) {
             return renderTikzHtml(token.content);
           }
           return origFence(tokens, idx, options, env, self);
+        };
+
+        // Decks with no tikz block have no fence output to carry the notes /
+        // slide-line signals, so the notes panel and scroll sync stayed empty.
+        // marp-vscode produces the preview HTML by calling this renderer's
+        // render() directly and returns it unsanitized, so appending here reaches
+        // the webview for every deck. The once-per-cycle flags make this a no-op
+        // when a tikz fence already emitted the signals.
+        const origRender = marpRenderer.render;
+        marpRenderer.render = function (this: any, tokens: any, options: any, env: any) {
+          const html = origRender.call(this, tokens, options, env);
+          const signals = buildSignalHtml();
+          if (signals) { outputChannel.appendLine('[marp-compat] Appended preview signals to render output'); }
+          return html + signals;
         };
       };
 
