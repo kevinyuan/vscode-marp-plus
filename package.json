@@ -1,8 +1,8 @@
 {
   "name": "vscode-tikzjax",
   "displayName": "Marp Plus",
-  "description": "AI-friendly, engineering-precise slide creation for Marp in VS Code: TikZ/LaTeX diagrams, slide navigator, speaker notes panel, modular includes, always-fresh preview, editable PPTX and PDF export",
-  "version": "0.4.42",
+  "description": "Build presentations the way you build software: an AI-friendly workflow, a professional authoring experience, and the precision that scientific and engineering presentations demand.",
+  "version": "0.4.43",
   "publisher": "kevinyuan",
   "icon": "icon.png",
   "author": {

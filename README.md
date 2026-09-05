@@ -5,11 +5,11 @@
 
 Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-obsidian--marp--tikz-black?logo=github)](https://github.com/kevinyuan/obsidian-marp-tikz) [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Marp%20TikZ-7c3aed?logo=obsidian)](https://obsidian.md/plugins?id=marp-tikz)
 
-**Build presentations the way you build software.** Marp Plus turns VS Code into a workbench for [Marp](https://marp.app/) slide decks that is friendly to AI agents, precise enough for engineering content, and comfortable enough to replace PowerPoint for the whole authoring cycle.
+**Build presentations the way you build software.** Marp Plus turns VS Code into a workbench for [Marp](https://marp.app/) slide decks with an AI-friendly workflow, a professional authoring experience, and the precision that scientific and engineering presentations demand.
 
-- **AI-friendly.** A deck is plain text all the way down: Markdown slides, a YAML theme, TikZ diagrams and Markdown speaker notes, split into small files with `%!include`. Every piece is easy to prompt for, review, diff and version. Whatever writes to disk, you or an agent, the preview is fresh on the next save.
+- **AI-friendly.** Every part of a deck — slides, theme, diagrams, speaker notes — is a source file you or an agent can generate, review and diff, wired together with `%!include`. Whatever writes to disk, the preview is fresh on the next save.
 - **Engineering precision.** Circuits, plots, chemical structures, commutative diagrams and any other TikZ/LaTeX figure render as vector graphics with real TeX fonts, identically in the preview and in the exported file.
-- **A professional presentation workflow.** A slide navigator with thumbnails and outline, a live speaker notes panel, and one-click export to editable PPTX (native text, math and tables) or PDF.
+- **A professional authoring experience.** A slide navigator with thumbnails and outline, a live speaker notes panel, and one-click export to editable PPTX (native text, math and tables) or PDF.
 
 The same diagrams and includes also work in the ordinary Markdown preview, so nothing here is limited to slides.
 
@@ -17,7 +17,7 @@ The same diagrams and includes also work in the ordinary Markdown preview, so no
 
 ### AI-friendly authoring
 
-- **Plain text end to end** — slides, theme, diagrams and notes are Markdown, YAML and TikZ. No binary files, no proprietary format, nothing an agent cannot read or write.
+- **Written and reviewed like code** — slides, theme, diagrams and notes are source files (Markdown, YAML, TikZ), not binary blobs in a proprietary format, so an agent can generate and revise any part of a deck.
 - **Modular decks** — `%!include` pulls in TikZ files and shared YAML frontmatter, `%!notes` pulls in speaker notes, so every diagram, theme and script lives in its own file and can be edited independently.
 - **Always-fresh preview** — saving any file re-renders the deck, its included files and its local images. A **Force Refresh Rendering** command bypasses every cache when you want to be sure.
 - **Scriptable export** — the bundled `marp-tikz.js` CLI produces PPTX or PDF from the command line for CI jobs and agent pipelines.
