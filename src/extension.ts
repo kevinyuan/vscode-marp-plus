@@ -992,10 +992,51 @@ function resolveMarpCli(): { cmd: string; prefix: string[] } {
   }
 }
 
+/** Thrown when marp-cli could not be located or run, distinct from marp-cli's own conversion errors. */
+class MarpCliMissingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MarpCliMissingError';
+  }
+}
+
+/**
+ * Detect "marp-cli binary is missing" failures that surface from *inside* a
+ * successfully-spawned npx (e.g. "sh: 1: marp: not found" on Linux/macOS shells,
+ * "'marp' is not recognized..." on Windows, or npx's own "could not determine
+ * executable to run"). These don't set error.code === 'ENOENT' on the outer
+ * process, since npx itself exists — only the package it tries to run is missing.
+ */
+function looksLikeMarpCliMissing(message: string): boolean {
+  return /\bmarp\b[^\n]*(not found|not recognized)/i.test(message)
+    || /(not found|not recognized)[^\n]*\bmarp\b/i.test(message)
+    || /could not determine executable to run/i.test(message);
+}
 
 // Cached on first call — spawning marp-cli/soffice for version checks is slow (~2-3s)
 let _marpEditableCache: boolean | undefined;
 let _libreOfficeCache: boolean | undefined;
+
+/** Install marp-cli globally via npm, streaming output to the extension's output channel. */
+function installMarpCli(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    outputChannel.appendLine('[marp-export] Installing marp-cli: npm i -g @marp-team/marp-cli');
+    execFile('npm', ['i', '-g', '@marp-team/marp-cli'], {
+      timeout: 180_000,
+      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+    }, (error, stdout, stderr) => {
+      if (stdout?.trim()) { outputChannel.appendLine(stdout.trim()); }
+      if (stderr?.trim()) { outputChannel.appendLine(stderr.trim()); }
+      if (error) {
+        reject(new Error(stderr?.trim() || error.message));
+        return;
+      }
+      // Re-check version/editable-pptx support now that marp-cli is freshly installed.
+      _marpEditableCache = undefined;
+      resolve();
+    });
+  });
+}
 
 /** Check marp-cli version and return true if >= 4.1.0. Result is cached. */
 function marpSupportsEditablePptx(): boolean {
@@ -1059,10 +1100,13 @@ function runMarpCli(processedMdPath: string, outputPath: string, cwd: string, ti
         const msg = stderr?.trim() || error.message;
         if (error.killed || (error as any).code === 'ETIMEDOUT') {
           reject(new Error(`marp-cli timed out after ${timeoutMs / 1000}s`));
-        } else if ((error as any).code === 'ENOENT') {
+        } else if ((error as any).code === 'ENOENT' || looksLikeMarpCliMissing(msg)) {
           // Export uses the marp-cli npm package, which is separate from the
           // "Marp for VS Code" extension — installing the extension does not provide it.
-          reject(new Error(
+          // ENOENT covers npx itself being missing; looksLikeMarpCliMissing() covers
+          // npx running fine but the marp-cli binary it tries to invoke being absent
+          // (e.g. "sh: 1: marp: not found").
+          reject(new MarpCliMissingError(
             'marp-cli was not found. Install it with "npm i -g @marp-team/marp-cli", ' +
             'or make sure Node.js and npx are on your PATH.'
           ));
@@ -1330,6 +1374,28 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
     }
   );
   } catch (err: any) {
+    if (err instanceof MarpCliMissingError) {
+      const action = await vscode.window.showErrorMessage(
+        `Export failed: ${err.message}`,
+        'Install marp-cli', 'Dismiss'
+      );
+      if (action === 'Install marp-cli') {
+        try {
+          await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: 'Installing marp-cli (npm i -g @marp-team/marp-cli)…' },
+            () => installMarpCli()
+          );
+          vscode.window.showInformationMessage('marp-cli installed. Retrying export…');
+          await exportMarpPptx(doc);
+        } catch (installErr: any) {
+          vscode.window.showErrorMessage(
+            `Failed to install marp-cli: ${installErr.message}. ` +
+            'Please install it manually with "npm i -g @marp-team/marp-cli" and try again.'
+          );
+        }
+      }
+      return;
+    }
     const retry = await vscode.window.showErrorMessage(
       `Export failed: ${err.message}`,
       'Retry', 'Dismiss'
