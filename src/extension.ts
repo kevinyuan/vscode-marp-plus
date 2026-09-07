@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { execFile, execFileSync } from 'child_process';
 import { DocumentParser } from './core/DocumentParser';
 import { CacheManager } from './core/CacheManager';
@@ -12,6 +11,7 @@ import { generateHash } from './utils/hash';
 import { extractAndReplaceMath, ExtractedMath } from './utils/mathPreprocessor';
 import { latexToOmml } from './utils/mathToOmml';
 import { injectMarpCjkFont } from './utils/marpCjkFont';
+import { injectPrintColorAdjust } from './utils/marpPrintColorAdjust';
 import { MarkdownIncludeResolver } from './utils/markdownPreprocessor';
 import { bustImageCache, collectLocalImagePaths } from './utils/imageCacheBuster';
 import { installParseWrapper } from './utils/parseWrapper';
@@ -1218,9 +1218,22 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
         blocks.push({ full: match[0], source: resolvedSource, includeError });
       }
 
-      // Create temp directory for processed files
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tikz-marp-'));
-      const imgDir = path.join(tmpDir, '.tikz-images');
+      // Write processed files (the transformed .md and rendered tikz SVGs) as
+      // hidden siblings of the original file, INSIDE inputDir, rather than under
+      // os.tmpdir(). marp-cli resolves the document's relative asset paths
+      // (images, includes, ../shared-assets/..., etc.) against the processed
+      // .md file's own directory — putting it anywhere else means every such
+      // reference would need to be individually re-created (symlinks only cover
+      // siblings, not parent-relative "../" paths), which silently broke images
+      // referenced from outside inputDir. Writing in-place guarantees identical
+      // resolution to the original file, at the cost of a brief hidden-file
+      // presence in the user's own directory (always removed in `finally`).
+      const exportId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const imgDirName = `.marp-plus-tikz-${exportId}`;
+      const imgDir = path.join(inputDir, imgDirName);
+      // Never the original file's own name — declared here (not inside `try`) so
+      // `finally` can always clean it up even if an earlier step throws.
+      const processedMdPath = path.join(inputDir, `.marp-plus-export-${exportId}.md`);
       fs.mkdirSync(imgDir);
 
       try {
@@ -1245,7 +1258,7 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
               const svgFile = path.join(imgDir, `tikz-${i + 1}.svg`);
               fs.writeFileSync(svgFile, fixed, 'utf-8');
 
-              const relPath = `.tikz-images/tikz-${i + 1}.svg`;
+              const relPath = `${imgDirName}/tikz-${i + 1}.svg`;
               const imgTag = `\n<div style="display:flex;justify-content:center;align-items:center;"><img src="${relPath}" /></div>\n`;
               md = md.replace(blocks[i].full, imgTag);
             } catch (err: any) {
@@ -1284,18 +1297,14 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
         // front-matter already defines a `style:` key.
         md = injectMarpCjkFont(md);
 
-        // Write processed markdown to temp dir
-        const processedMdPath = path.join(tmpDir, `${inputBasename}.md`);
-        fs.writeFileSync(processedMdPath, md, 'utf-8');
+        // Force Chromium to keep background colors/gradients/box-shadows in the
+        // exported PDF/PPTX — without this, print rendering silently drops them
+        // (background color, gradient underlines, glow effects) even though
+        // they show correctly in the live preview.
+        md = injectPrintColorAdjust(md);
 
-        // Symlink assets from original directory so relative paths in CSS resolve
-        for (const entry of fs.readdirSync(inputDir)) {
-          const src = path.join(inputDir, entry);
-          const dest = path.join(tmpDir, entry);
-          if (!fs.existsSync(dest)) {
-            try { fs.symlinkSync(src, dest); } catch { /* skip if symlink fails */ }
-          }
-        }
+        // Write processed markdown to its (pre-computed, hidden) path.
+        fs.writeFileSync(processedMdPath, md, 'utf-8');
 
         // Determine output path (next to original file, timestamped)
         const now = new Date();
@@ -1317,7 +1326,7 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
               : 'Running marp-cli…'
           });
           try {
-            await runMarpCli(processedMdPath, outputPath, tmpDir, MARP_CLI_TIMEOUT, useEditable, exportFormat);
+            await runMarpCli(processedMdPath, outputPath, inputDir, MARP_CLI_TIMEOUT, useEditable, exportFormat);
             lastError = undefined;
             break;
           } catch (err: any) {
@@ -1368,8 +1377,9 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
 
         return outputPath;
       } finally {
-        // Cleanup temp directory
-        fs.rmSync(tmpDir, { recursive: true, force: true });
+        // Cleanup: remove only the hidden files/folders we created in inputDir.
+        fs.rmSync(processedMdPath, { force: true });
+        fs.rmSync(imgDir, { recursive: true, force: true });
       }
     }
   );
