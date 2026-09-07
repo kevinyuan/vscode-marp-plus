@@ -3,7 +3,7 @@
 [![VS Marketplace](https://vsmarketplacebadges.dev/installs-short/kevinyuan.vscode-tikzjax.svg?label=VS%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=kevinyuan.vscode-tikzjax)
 [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/kevinyuan/vscode-tikzjax?label=Open%20VSX&logo=vscodium)](https://open-vsx.org/extension/kevinyuan/vscode-tikzjax)
 
-Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-obsidian--marp--plus-black?logo=github)](https://github.com/kevinyuan/obsidian-marp-plus) [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Marp%20TikZ%20Plus-7c3aed?logo=obsidian)](https://obsidian.md/plugins?id=marp-tikz-plus)
+Also available for Obsidian: [![GitHub](https://img.shields.io/badge/GitHub-obsidian--marp--plus-black?logo=github)](https://github.com/kevinyuan/obsidian-marp-plus) [![Obsidian Plugin](https://img.shields.io/badge/Obsidian-Marp%20Plus-7c3aed?logo=obsidian)](https://obsidian.md/plugins?id=marp-tikz-plus)
 
 **Build presentations the way you build software.** Marp Plus turns VS Code into a workbench for [Marp](https://marp.app/) slide decks with an AI-friendly workflow, a professional authoring experience, and the precision that scientific and engineering presentations demand.
 
