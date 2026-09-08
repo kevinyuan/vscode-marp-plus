@@ -2,7 +2,7 @@
   "name": "vscode-tikzjax",
   "displayName": "Marp Plus",
   "description": "Build presentations the way you build software: an AI-friendly workflow, a professional authoring experience, and the precision that scientific and engineering presentations demand.",
-  "version": "0.4.46",
+  "version": "0.4.47",
   "publisher": "kevinyuan",
   "icon": "icon.png",
   "author": {
@@ -81,14 +81,9 @@
       },
       {
         "command": "marpPlus.forceRefresh",
-        "title": "Force Refresh Rendering",
+        "title": "Refresh Diagrams",
         "category": "Marp Plus",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "marpPlus.refreshDiagrams",
-        "title": "Refresh TikZ Diagrams",
-        "category": "Marp Plus",
+        "icon": "$(refresh)",
         "when": "editorLangId == markdown"
       },
       {
@@ -105,9 +100,18 @@
       },
       {
         "command": "marpPlus.exportMarpPptx",
-        "title": "Export Marp Slides to PPTX",
-        "category": "Marp Plus",
-        "icon": "$(desktop-download)"
+        "title": "Export PPTX",
+        "category": "Marp Plus"
+      },
+      {
+        "command": "marpPlus.exportMarpPptxNotes",
+        "title": "Export PPTX with Notes",
+        "category": "Marp Plus"
+      },
+      {
+        "command": "marpPlus.exportMarpPdf",
+        "title": "Export PDF",
+        "category": "Marp Plus"
       },
       {
         "command": "marpPlus.toggleThumbnails",
@@ -119,6 +123,13 @@
         "command": "marpPlus.toggleMarpPptxNotes",
         "title": "Toggle Speaker Notes Export",
         "category": "Marp Plus"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "marpPlus.exportMenu",
+        "label": "Marp Plus",
+        "icon": "media/marp-plus-toolbar.svg"
       }
     ],
     "menus": {
@@ -139,19 +150,37 @@
           "when": "activeCustomEditorId == 'vscode.markdown.preview.editor'"
         },
         {
-          "command": "marpPlus.exportMarpPptx",
+          "submenu": "marpPlus.exportMenu",
           "group": "navigation",
           "when": "editorLangId == markdown && marpPlus.isMarpFile"
         },
         {
-          "command": "marpPlus.exportMarpPptx",
+          "submenu": "marpPlus.exportMenu",
           "group": "navigation",
           "when": "activeWebviewPanelId == 'markdown.preview' && marpPlus.isMarpFile"
         },
         {
-          "command": "marpPlus.exportMarpPptx",
+          "submenu": "marpPlus.exportMenu",
           "group": "navigation",
           "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && marpPlus.isMarpFile"
+        }
+      ],
+      "marpPlus.exportMenu": [
+        {
+          "command": "marpPlus.openPreview",
+          "group": "1_preview@1"
+        },
+        {
+          "command": "marpPlus.exportMarpPptx",
+          "group": "2_export@1"
+        },
+        {
+          "command": "marpPlus.exportMarpPptxNotes",
+          "group": "2_export@2"
+        },
+        {
+          "command": "marpPlus.exportMarpPdf",
+          "group": "2_export@3"
         }
       ]
     },
@@ -208,15 +237,6 @@
           "type": "boolean",
           "default": true,
           "description": "Include speaker notes (<!-- ... --> HTML comments) when exporting Marp slides to PPTX."
-        },
-        "tikzjax.exportFormat": {
-          "type": "string",
-          "enum": [
-            "pptx",
-            "pdf"
-          ],
-          "default": "pptx",
-          "description": "Last used export format (pptx or pdf). Updated automatically when you export."
         }
       }
     }

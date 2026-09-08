@@ -737,6 +737,15 @@ function findMarkdownDocument(): vscode.TextDocument | undefined {
   return vscode.workspace.textDocuments.find(d => d.languageId === 'markdown');
 }
 
+function resolveExportDocument(): vscode.TextDocument | undefined {
+  const doc = findMarkdownDocument();
+  if (!doc) {
+    vscode.window.showWarningMessage('Open a Marp markdown file to export.');
+    return undefined;
+  }
+  return doc;
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -763,27 +772,19 @@ function registerCommands(context: vscode.ExtensionContext): void {
         vscode.window.showWarningMessage('Open a Markdown file to refresh its preview.');
         return;
       }
-      // Bypass every cache layer: included files, in-memory + persistent diagram
-      // results for this document, and the webview's image cache (via mtime stamps
-      // on the next parse). Then re-render and force the preview to re-parse.
+      // Bypass every cache layer, not just this document's: included markdown/tikz
+      // files, the persistent + in-memory SVG/diagram cache (all workspaces, like
+      // "Clear Diagram Cache"), and the webview's own image cache (which self-busts
+      // via mtime stamps on the next parse). Then re-render and force the preview
+      // to re-parse — one command that fully rebuilds everything.
       invalidateIncludeCaches();
       const blocks = documentParser.parse(doc);
-      for (const block of blocks) { await cacheManager.invalidate(block.hash); }
+      await cacheManager.clear();
       previewManager.clearMemoryCache();
       await refreshPreviewedDocument('force-refresh', doc);
       vscode.window.setStatusBarMessage(
         `$(refresh) Marp Plus: preview refreshed (${blocks.length} diagram(s) re-rendered)`, 3000
       );
-    }),
-
-    vscode.commands.registerCommand('marpPlus.refreshDiagrams', async () => {
-      const doc = findMarkdownDocument();
-      if (!doc || !previewManager || !cacheManager || !documentParser) { return; }
-      const blocks = documentParser.parse(doc);
-      for (const block of blocks) { await cacheManager.invalidate(block.hash); }
-      previewManager.clearMemoryCache();
-      await previewManager.renderDocument(doc);
-      vscode.window.setStatusBarMessage(`$(sync) Refreshed ${blocks.length} TikZ diagram(s)`, 3000);
     }),
 
     vscode.commands.registerCommand('marpPlus.clearCache', async () => {
@@ -805,15 +806,21 @@ function registerCommands(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand('marpPlus.exportMarpPptx', async () => {
-      const editor = vscode.window.activeTextEditor;
-      const doc = (editor && editor.document.languageId === 'markdown')
-        ? editor.document
-        : findMarkdownDocument();
-      if (!doc) {
-        vscode.window.showWarningMessage('Open a Marp markdown file to export.');
-        return;
-      }
-      await exportMarpPptx(doc);
+      const doc = resolveExportDocument();
+      if (!doc) { return; }
+      await exportMarp(doc, 'pptx', false);
+    }),
+
+    vscode.commands.registerCommand('marpPlus.exportMarpPptxNotes', async () => {
+      const doc = resolveExportDocument();
+      if (!doc) { return; }
+      await exportMarp(doc, 'pptx', true);
+    }),
+
+    vscode.commands.registerCommand('marpPlus.exportMarpPdf', async () => {
+      const doc = resolveExportDocument();
+      if (!doc) { return; }
+      await exportMarp(doc, 'pdf', false);
     }),
 
     vscode.commands.registerCommand('marpPlus.toggleMarpPptxNotes', async () => {
@@ -1135,37 +1142,10 @@ const MARP_CLI_TIMEOUT = 60_000;
  * Export the active Marp document to PPTX or PDF, rendering TikZ blocks to SVG first.
  * Shows a pre-export options toast (format + speaker notes) and persists the choice.
  */
-async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
+async function exportMarp(doc: vscode.TextDocument, exportFormat: 'pptx' | 'pdf', exportNotes: boolean): Promise<void> {
   const inputPath = doc.uri.fsPath;
   const inputDir = path.dirname(inputPath);
   const inputBasename = path.basename(inputPath, '.md');
-
-  // ── Pre-export options prompt ─────────────────────────────────────────────
-  const cfg = vscode.workspace.getConfiguration('tikzjax');
-  const lastFormat = cfg.get<'pptx' | 'pdf'>('exportFormat', 'pptx');
-  const lastNotes  = cfg.get<boolean>('marpPptxNotes', true);
-
-  // Put last-used button first so it appears highlighted (primary position)
-  const allButtons: Array<'PPTX + Notes' | 'PPTX' | 'PDF'> = ['PPTX + Notes', 'PPTX', 'PDF'];
-  const lastBtn: 'PPTX + Notes' | 'PPTX' | 'PDF' =
-    lastFormat === 'pdf' ? 'PDF' : lastNotes ? 'PPTX + Notes' : 'PPTX';
-  const ordered = [lastBtn, ...allButtons.filter(b => b !== lastBtn)];
-
-  const choice = await vscode.window.showInformationMessage(
-    'Select export format:',
-    ...ordered
-  );
-  if (!choice) { return; }
-
-  const exportFormat: 'pptx' | 'pdf' = choice === 'PDF' ? 'pdf' : 'pptx';
-  const exportNotes = choice === 'PPTX + Notes';
-
-  // Persist choices
-  await cfg.update('exportFormat', exportFormat, vscode.ConfigurationTarget.Global);
-  if (exportFormat === 'pptx') {
-    await cfg.update('marpPptxNotes', exportNotes, vscode.ConfigurationTarget.Global);
-  }
-  // ─────────────────────────────────────────────────────────────────────────
 
   let result: string | undefined;
   try {
@@ -1396,7 +1376,7 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
             () => installMarpCli()
           );
           vscode.window.showInformationMessage('marp-cli installed. Retrying export…');
-          await exportMarpPptx(doc);
+          await exportMarp(doc, exportFormat, exportNotes);
         } catch (installErr: any) {
           vscode.window.showErrorMessage(
             `Failed to install marp-cli: ${installErr.message}. ` +
@@ -1411,7 +1391,7 @@ async function exportMarpPptx(doc: vscode.TextDocument): Promise<void> {
       'Retry', 'Dismiss'
     );
     if (retry === 'Retry') {
-      await exportMarpPptx(doc);
+      await exportMarp(doc, exportFormat, exportNotes);
     }
     return;
   }
