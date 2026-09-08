@@ -823,6 +823,33 @@ function registerCommands(context: vscode.ExtensionContext): void {
       await exportMarp(doc, 'pdf', false);
     }),
 
+    // Preview-panel title bars don't support submenu dropdowns (only the plain
+    // text editor's title bar does), so this single button — used only there —
+    // keeps the old format-selection prompt instead of separate menu entries.
+    vscode.commands.registerCommand('marpPlus.exportMarpPicker', async () => {
+      const doc = resolveExportDocument();
+      if (!doc) { return; }
+
+      const cfg = vscode.workspace.getConfiguration('tikzjax');
+      const lastNotes = cfg.get<boolean>('marpPptxNotes', true);
+
+      // Put last-used button first so it appears highlighted (primary position)
+      const allButtons: Array<'PPTX + Notes' | 'PPTX' | 'PDF'> = ['PPTX + Notes', 'PPTX', 'PDF'];
+      const lastBtn: 'PPTX + Notes' | 'PPTX' | 'PDF' = lastNotes ? 'PPTX + Notes' : 'PPTX';
+      const ordered = [lastBtn, ...allButtons.filter(b => b !== lastBtn)];
+
+      const choice = await vscode.window.showInformationMessage('Select export format:', ...ordered);
+      if (!choice) { return; }
+
+      const format: 'pptx' | 'pdf' = choice === 'PDF' ? 'pdf' : 'pptx';
+      const notes = choice === 'PPTX + Notes';
+      if (format === 'pptx') {
+        await cfg.update('marpPptxNotes', notes, vscode.ConfigurationTarget.Global);
+      }
+
+      await exportMarp(doc, format, notes);
+    }),
+
     vscode.commands.registerCommand('marpPlus.toggleMarpPptxNotes', async () => {
       const config = vscode.workspace.getConfiguration('tikzjax');
       const current = config.get<boolean>('marpPptxNotes', true);
