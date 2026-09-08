@@ -2,7 +2,7 @@
   "name": "vscode-tikzjax",
   "displayName": "Marp Plus",
   "description": "Build presentations the way you build software: an AI-friendly workflow, a professional authoring experience, and the precision that scientific and engineering presentations demand.",
-  "version": "0.4.49",
+  "version": "0.4.50",
   "publisher": "kevinyuan",
   "icon": "icon.png",
   "author": {
@@ -117,7 +117,7 @@
         "command": "marpPlus.exportMarpPicker",
         "title": "Export Slides…",
         "category": "Marp Plus",
-        "icon": "media/marp-plus-toolbar.svg"
+        "icon": "$(desktop-download)"
       },
       {
         "command": "marpPlus.toggleThumbnails",
@@ -135,16 +135,11 @@
       {
         "id": "marpPlus.exportMenu",
         "label": "Marp Plus",
-        "icon": "$(desktop-download)"
+        "icon": "$(multiple-windows)"
       }
     ],
     "menus": {
       "editor/title": [
-        {
-          "command": "marpPlus.forceRefresh",
-          "group": "navigation",
-          "when": "editorLangId == markdown"
-        },
         {
           "command": "marpPlus.forceRefresh",
           "group": "navigation",
