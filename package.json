@@ -120,6 +120,13 @@
         "icon": "$(desktop-download)"
       },
       {
+        "command": "marpPlus.editSpeakerNotes",
+        "title": "Edit Speaker Notes",
+        "category": "Marp Plus",
+        "icon": "$(edit)",
+        "when": "editorLangId == markdown"
+      },
+      {
         "command": "marpPlus.toggleThumbnails",
         "title": "Toggle Slide Thumbnails",
         "category": "Marp Plus",
@@ -150,6 +157,16 @@
         },
         {
           "command": "marpPlus.exportMarpPicker",
+          "group": "navigation",
+          "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && marpPlus.isMarpFile"
+        },
+        {
+          "command": "marpPlus.editSpeakerNotes",
+          "group": "navigation",
+          "when": "activeWebviewPanelId == 'markdown.preview' && marpPlus.isMarpFile"
+        },
+        {
+          "command": "marpPlus.editSpeakerNotes",
           "group": "navigation",
           "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && marpPlus.isMarpFile"
         }

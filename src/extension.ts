@@ -134,6 +134,52 @@ function parseSpeakerNotes(markdown: string): string[] {
   return notes;
 }
 
+/** Location of a speaker-note HTML comment within a slide's source lines. */
+interface NoteCommentRange {
+  /** Range of the whole `<!-- ... -->` comment, including delimiters. */
+  outer: vscode.Range;
+  /** Range of the comment's inner text, for placing the cursor/selection to edit it. */
+  inner: vscode.Range;
+}
+
+/** Find the first speaker-note HTML comment within [startLine, endLine) of doc, skipping
+ *  Marp directive comments (e.g. `<!-- _class: title -->`). Mirrors parseSpeakerNotes'
+ *  detection rules but returns positions instead of text. */
+function findSlideNoteRange(doc: vscode.TextDocument, startLine: number, endLine: number): NoteCommentRange | undefined {
+  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
+    const lineText = doc.lineAt(i).text;
+
+    const singleMatch = lineText.match(/<!--\s*(.*?)\s*-->/);
+    if (singleMatch) {
+      const content = singleMatch[1] ?? '';
+      if (content && content.match(/^_?\w+\s*:/)) { continue; } // directive, not a note
+      const openCh = lineText.indexOf('<!--');
+      const closeCh = lineText.lastIndexOf('-->');
+      const innerStartCh = lineText.indexOf(content, openCh + 4);
+      return {
+        outer: new vscode.Range(i, openCh, i, closeCh + 3),
+        inner: new vscode.Range(i, innerStartCh, i, innerStartCh + content.length),
+      };
+    }
+
+    const startMatch = lineText.match(/<!--\s*(.*)$/);
+    if (startMatch && lineText.indexOf('-->') === -1) {
+      const openCh = lineText.indexOf('<!--');
+      for (let j = i + 1; j < endLine && j < doc.lineCount; j++) {
+        const closeCh = doc.lineAt(j).text.indexOf('-->');
+        if (closeCh >= 0) {
+          return {
+            outer: new vscode.Range(i, openCh, j, closeCh + 3),
+            inner: new vscode.Range(i, openCh + 4, j, closeCh),
+          };
+        }
+      }
+      return undefined; // unterminated comment; leave it alone
+    }
+  }
+  return undefined;
+}
+
 
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel('Marp Plus');
@@ -848,6 +894,57 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
 
       await exportMarp(doc, format, notes);
+    }),
+
+    // The preview's Speaker Notes panel is injected into VS Code's built-in Markdown
+    // preview webview, which gives it no way to message the extension back (its
+    // acquireVsCodeApi() is already claimed by the preview's own bootstrap script, and
+    // command: links aren't enabled for that webview). So "editing" the panel means
+    // jumping into the real source instead of a save button inside the panel itself.
+    vscode.commands.registerCommand('marpPlus.editSpeakerNotes', async () => {
+      const doc = findMarkdownDocument();
+      if (!doc) {
+        vscode.window.showWarningMessage('Open a Marp markdown file to edit its speaker notes.');
+        return;
+      }
+      const head = doc.getText().slice(0, 500);
+      if (!/^---[\s\S]*?marp:\s*true/m.test(head)) {
+        vscode.window.showWarningMessage('Speaker notes are only available for Marp decks (add "marp: true" to the frontmatter).');
+        return;
+      }
+
+      const sourceEditor = vscode.window.visibleTextEditors.find(e => e.document === doc);
+      const cursorLine = sourceEditor?.selection.active.line ?? 0;
+
+      const slideLines = parseSlideLineNumbers(doc.getText());
+      let slideIndex = 0;
+      for (let i = 0; i < slideLines.length; i++) {
+        if (slideLines[i] <= cursorLine) { slideIndex = i; } else { break; }
+      }
+      const slideStart = slideLines[slideIndex];
+      const slideEnd = slideIndex + 1 < slideLines.length ? slideLines[slideIndex + 1] : doc.lineCount;
+
+      const editor = await vscode.window.showTextDocument(doc, { viewColumn: sourceEditor?.viewColumn });
+
+      let noteRange = findSlideNoteRange(doc, slideStart, slideEnd);
+      if (!noteRange) {
+        const insertAtEof = slideEnd >= doc.lineCount;
+        await editor.edit(editBuilder => {
+          if (insertAtEof) {
+            const lastLine = doc.lineAt(doc.lineCount - 1);
+            const prefix = lastLine.text.length > 0 ? '\n' : '';
+            editBuilder.insert(lastLine.range.end, `${prefix}<!--  -->\n`);
+          } else {
+            editBuilder.insert(new vscode.Position(slideEnd, 0), '<!--  -->\n');
+          }
+        });
+        noteRange = findSlideNoteRange(doc, slideStart, insertAtEof ? doc.lineCount : slideEnd + 1);
+      }
+
+      if (noteRange) {
+        editor.selection = new vscode.Selection(noteRange.inner.start, noteRange.inner.end);
+        editor.revealRange(noteRange.outer, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+      }
     }),
 
     vscode.commands.registerCommand('marpPlus.toggleMarpPptxNotes', async () => {
