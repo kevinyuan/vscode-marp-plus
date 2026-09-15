@@ -121,7 +121,7 @@
       },
       {
         "command": "marpPlus.editSpeakerNotes",
-        "title": "Edit Speaker Notes",
+        "title": "Edit Speaker Notes (open the Notes panel first to see a live preview)",
         "category": "Marp Plus",
         "icon": "$(edit)",
         "when": "editorLangId == markdown"
