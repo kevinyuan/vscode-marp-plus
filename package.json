@@ -131,13 +131,6 @@
         "category": "Marp Plus"
       }
     ],
-    "submenus": [
-      {
-        "id": "marpPlus.exportMenu",
-        "label": "Marp Plus",
-        "icon": "$(multiple-windows)"
-      }
-    ],
     "menus": {
       "editor/title": [
         {
@@ -151,11 +144,6 @@
           "when": "activeCustomEditorId == 'vscode.markdown.preview.editor'"
         },
         {
-          "submenu": "marpPlus.exportMenu",
-          "group": "navigation",
-          "when": "editorLangId == markdown && marpPlus.isMarpFile"
-        },
-        {
           "command": "marpPlus.exportMarpPicker",
           "group": "navigation",
           "when": "activeWebviewPanelId == 'markdown.preview' && marpPlus.isMarpFile"
@@ -164,24 +152,6 @@
           "command": "marpPlus.exportMarpPicker",
           "group": "navigation",
           "when": "activeCustomEditorId == 'vscode.markdown.preview.editor' && marpPlus.isMarpFile"
-        }
-      ],
-      "marpPlus.exportMenu": [
-        {
-          "command": "marpPlus.openPreview",
-          "group": "1_preview@1"
-        },
-        {
-          "command": "marpPlus.exportMarpPptx",
-          "group": "2_export@1"
-        },
-        {
-          "command": "marpPlus.exportMarpPptxNotes",
-          "group": "2_export@2"
-        },
-        {
-          "command": "marpPlus.exportMarpPdf",
-          "group": "2_export@3"
         }
       ]
     },
