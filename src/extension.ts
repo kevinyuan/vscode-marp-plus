@@ -142,6 +142,24 @@ interface NoteCommentRange {
   inner: vscode.Range;
 }
 
+/** Matches a %!notes directive line — mirrors MarkdownIncludeResolver's own regex, kept
+ *  separate because that one carries /g state across calls. */
+const SLIDE_NOTES_DIRECTIVE_RE = /^[ \t]*%!notes[ \t]+(.+?)[ \t]*$/;
+
+/** Find every %!notes file a slide's raw source lines point to (a slide may have several).
+ *  Must run on the un-resolved document text: %!notes is expanded into a `<!-- -->` comment
+ *  before Marp/parseSpeakerNotes ever see it (see MarkdownIncludeResolver). */
+function findSlideNotesFiles(doc: vscode.TextDocument, startLine: number, endLine: number, baseDir: string): string[] {
+  const files: string[] = [];
+  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
+    const match = doc.lineAt(i).text.match(SLIDE_NOTES_DIRECTIVE_RE);
+    if (!match) { continue; }
+    const rawFile = match[1].trim();
+    files.push(path.isAbsolute(rawFile) ? rawFile : path.resolve(baseDir, rawFile));
+  }
+  return files;
+}
+
 /** Find the first speaker-note HTML comment within [startLine, endLine) of doc, skipping
  *  Marp directive comments (e.g. `<!-- _class: title -->`). Mirrors parseSpeakerNotes'
  *  detection rules but returns positions instead of text. */
@@ -923,6 +941,33 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
       const slideStart = slideLines[slideIndex];
       const slideEnd = slideIndex + 1 < slideLines.length ? slideLines[slideIndex + 1] : doc.lineCount;
+
+      // A %!notes directive points the slide's notes at an external file — that file, not
+      // the deck, is what should open. A slide can have more than one.
+      const notesFiles = findSlideNotesFiles(doc, slideStart, slideEnd, path.dirname(doc.uri.fsPath));
+      if (notesFiles.length > 0) {
+        let target = notesFiles[0];
+        if (notesFiles.length > 1) {
+          const picked = await vscode.window.showQuickPick(
+            notesFiles.map(f => ({ label: path.basename(f), description: path.relative(path.dirname(doc.uri.fsPath), f), file: f })),
+            { placeHolder: 'This slide has multiple %!notes files — pick one to edit' }
+          );
+          if (!picked) { return; }
+          target = picked.file;
+        }
+        if (!fs.existsSync(target)) {
+          try {
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, '');
+          } catch {
+            vscode.window.showWarningMessage(`Could not create notes file: ${target}`);
+            return;
+          }
+        }
+        const notesDoc = await vscode.workspace.openTextDocument(target);
+        await vscode.window.showTextDocument(notesDoc, { preview: false });
+        return;
+      }
 
       const editor = await vscode.window.showTextDocument(doc, { viewColumn: sourceEditor?.viewColumn });
 
