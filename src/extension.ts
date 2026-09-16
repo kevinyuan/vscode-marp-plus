@@ -577,6 +577,15 @@ let includeFileWatchers: fs.FSWatcher[] = [];
 let watchedIncludePaths = new Set<string>();
 let includeWatchDebounce: NodeJS.Timeout | undefined;
 
+/**
+ * The deck watchedIncludePaths was computed for. findMarkdownDocument() falls back to
+ * activeTextEditor, which is wrong here: opening one of the deck's own dependencies (e.g. a
+ * %!notes file, from its new Notes-panel link) makes THAT the active editor, so a save handler
+ * that re-derived "the deck" via findMarkdownDocument() at save time would refresh the notes
+ * file instead of the deck depending on it — or nothing at all.
+ */
+let watchedDeckDocument: vscode.TextDocument | undefined;
+
 /** Local image files referenced by the last previewed source (absolute paths). */
 let trackedImagePaths = new Set<string>();
 
@@ -599,7 +608,7 @@ function onDependencyChanged(filePath: string, reason: string): void {
   if (includeWatchDebounce) { clearTimeout(includeWatchDebounce); }
   includeWatchDebounce = setTimeout(() => {
     includeWatchDebounce = undefined;
-    void refreshPreviewedDocument('dep-change');
+    void refreshPreviewedDocument('dep-change', watchedDeckDocument);
   }, 300);
 }
 
@@ -625,6 +634,7 @@ function updateIncludeFileWatcher(): void {
   if (!documentParser) { return; }
   const doc = findMarkdownDocument();
   if (!doc) { return; }
+  watchedDeckDocument = doc;
 
   // Merge tikz %!include paths, markdown (frontmatter/notes) %!include paths, and local images
   const tikzPaths = documentParser.getIncludedFiles(doc.uri.toString());
@@ -893,10 +903,12 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
       if (!previewManager) { return; }
       const savedPath = doc.uri.fsPath;
 
-      // A dependency of the previewed deck (included md/yaml/tikz, or an image
-      // opened as text) — refresh the deck, not the dependency.
-      const previewed = findMarkdownDocument();
-      if (previewed && previewed.uri.toString() !== doc.uri.toString() && watchedIncludePaths.has(savedPath)) {
+      // A dependency of the previewed deck (included md/yaml/tikz, a %!notes file, or an
+      // image opened as text) — refresh the deck, not the dependency. Checked by path alone:
+      // the saved file is very often the active editor right now (e.g. a %!notes file just
+      // edited via the Notes panel's link), which would make findMarkdownDocument() return
+      // it instead of the deck and wrongly skip this branch.
+      if (watchedIncludePaths.has(savedPath)) {
         onDependencyChanged(savedPath, 'doc-save');
         return;
       }
