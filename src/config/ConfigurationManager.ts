@@ -23,6 +23,9 @@ export interface ExtensionConfiguration {
 
     /** Whether to include speaker notes when exporting Marp PPTX */
     marpPptxNotes: boolean;
+
+    /** Timeout in milliseconds for marp-cli PPTX/PDF export */
+    marpExportTimeout: number;
 }
 
 /**
@@ -74,7 +77,8 @@ export class ConfigurationManager {
             autoPreview: config.get<boolean>('autoPreview', false),
             previewPosition: config.get<'side' | 'below' | 'window'>('previewPosition', 'side'),
             marpPptxEditable: config.get<boolean>('marpPptxEditable', true),
-            marpPptxNotes: config.get<boolean>('marpPptxNotes', true)
+            marpPptxNotes: config.get<boolean>('marpPptxNotes', true),
+            marpExportTimeout: config.get<number>('marpExportTimeout', 180000)
         };
     }
 

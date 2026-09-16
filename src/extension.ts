@@ -1124,8 +1124,10 @@ function runMarpCli(processedMdPath: string, outputPath: string, cwd: string, ti
   });
 }
 
-/** Timeout value for marp-cli (60 seconds) */
-const MARP_CLI_TIMEOUT = 60_000;
+/** Fallback if configManager isn't available yet. 60s was measured to be too short for real
+ *  decks: a 23-slide, image-heavy deck with --pptx-editable (LibreOffice conversion) took ~75s;
+ *  tikzjax.marpExportTimeout (default 180s) is the actual, user-overridable source of truth. */
+const DEFAULT_MARP_CLI_TIMEOUT = 180_000;
 
 
 /**
@@ -1240,6 +1242,7 @@ async function exportMarp(doc: vscode.TextDocument, exportFormat: 'pptx' | 'pdf'
         if (token.isCancellationRequested) { return; }
 
         const useEditable = configManager?.getConfiguration().marpPptxEditable ?? true;
+        const marpCliTimeout = configManager?.getConfiguration().marpExportTimeout ?? DEFAULT_MARP_CLI_TIMEOUT;
         const isPptxEditable = exportFormat === 'pptx' && useEditable && marpSupportsEditablePptx();
 
         const mathResult = isPptxEditable
@@ -1296,7 +1299,7 @@ async function exportMarp(doc: vscode.TextDocument, exportFormat: 'pptx' | 'pdf'
               : 'Running marp-cli…'
           });
           try {
-            await runMarpCli(processedMdPath, outputPath, inputDir, MARP_CLI_TIMEOUT, useEditable, exportFormat);
+            await runMarpCli(processedMdPath, outputPath, inputDir, marpCliTimeout, useEditable, exportFormat);
             lastError = undefined;
             break;
           } catch (err: any) {

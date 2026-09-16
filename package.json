@@ -208,6 +208,13 @@
           "type": "boolean",
           "default": true,
           "description": "Include speaker notes (<!-- ... --> HTML comments) when exporting Marp slides to PPTX."
+        },
+        "tikzjax.marpExportTimeout": {
+          "type": "number",
+          "default": 180000,
+          "minimum": 30000,
+          "maximum": 900000,
+          "description": "Maximum time (in milliseconds) to wait for marp-cli to finish exporting PPTX/PDF before timing out. Large or image-heavy decks with --pptx-editable (LibreOffice conversion) can take well over a minute."
         }
       }
     }

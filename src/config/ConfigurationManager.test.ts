@@ -60,6 +60,7 @@ describe('ConfigurationManager', () => {
                 previewPosition: 'side',
                 marpPptxEditable: true,
                 marpPptxNotes: true,
+                marpExportTimeout: 180000,
             });
         });
 
