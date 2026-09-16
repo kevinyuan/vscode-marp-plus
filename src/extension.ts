@@ -16,6 +16,7 @@ import { MarkdownIncludeResolver } from './utils/markdownPreprocessor';
 import { bustImageCache, collectLocalImagePaths } from './utils/imageCacheBuster';
 import { installParseWrapper } from './utils/parseWrapper';
 import { embedTexFonts } from './utils/texFonts';
+import { parseSlideLineNumbers, parseSpeakerNotes, computeSlideNoteLinks, SlideNoteLink } from './utils/speakerNotes';
 
 /** Directory holding the bundled BaKoMa TeX fonts (see scripts/sync-tex-fonts.js). */
 function texFontDir(): string {
@@ -49,184 +50,9 @@ let notesInjected = false;
 let cachedSlideLines: number[] = [];
 let slideLinesInjected = false;
 
-/** Return the 0-based source line number where each Marp slide starts.
- *  Slide 0 starts after the frontmatter; subsequent slides start at each `---`. */
-function parseSlideLineNumbers(markdown: string): number[] {
-  const lines = markdown.split('\n');
-  const slideLines: number[] = [];
-  let inFrontmatter = false;
-  let frontmatterEnd = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    if (i === 0 && lines[i].trim() === '---') { inFrontmatter = true; continue; }
-    if (inFrontmatter && lines[i].trim() === '---') { frontmatterEnd = i; break; }
-  }
-
-  slideLines.push(frontmatterEnd + 1); // first slide starts after frontmatter
-  for (let i = frontmatterEnd + 1; i < lines.length; i++) {
-    if (lines[i].trim() === '---') { slideLines.push(i); }
-  }
-  return slideLines;
-}
-
-/** Parse Marp speaker notes from markdown source.
- *  Notes are HTML comments (<!-- ... -->) within each slide. */
-function parseSpeakerNotes(markdown: string): string[] {
-  const lines = markdown.split('\n');
-  const notes: string[] = [];
-  let currentNotes: string[] = [];
-  let inFrontmatter = false;
-  let frontmatterDone = false;
-  let inComment = false;
-  let commentLines: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Skip frontmatter
-    if (i === 0 && line.trim() === '---') { inFrontmatter = true; continue; }
-    if (inFrontmatter && line.trim() === '---') { inFrontmatter = false; frontmatterDone = true; continue; }
-    if (inFrontmatter || !frontmatterDone) { continue; }
-
-    // Slide separator
-    if (line.trim() === '---') {
-      notes.push(currentNotes.join('\n').trim());
-      currentNotes = [];
-      continue;
-    }
-
-    // Multi-line comment handling
-    if (inComment) {
-      const endIdx = line.indexOf('-->');
-      if (endIdx >= 0) {
-        commentLines.push(line.substring(0, endIdx));
-        currentNotes.push(commentLines.join('\n').trim());
-        commentLines = [];
-        inComment = false;
-      } else {
-        commentLines.push(line);
-      }
-      continue;
-    }
-
-    // Single-line comment: <!-- ... -->
-    const singleMatch = line.match(/<!--\s*(.*?)\s*-->/);
-    if (singleMatch) {
-      // Skip directives like <!-- _class: title -->
-      const content = singleMatch[1];
-      if (content && !content.match(/^_?\w+\s*:/)) {
-        currentNotes.push(content);
-      }
-      continue;
-    }
-
-    // Start of multi-line comment: <!--
-    const startMatch = line.match(/<!--\s*(.*)/);
-    if (startMatch) {
-      inComment = true;
-      commentLines = [startMatch[1]];
-      continue;
-    }
-  }
-  // Last slide
-  notes.push(currentNotes.join('\n').trim());
-
-  return notes;
-}
-
-/** Location of a speaker-note HTML comment within a slide's source lines. */
-interface NoteCommentRange {
-  /** Range of the whole `<!-- ... -->` comment, including delimiters. */
-  outer: vscode.Range;
-  /** Range of the comment's inner text, for placing the cursor/selection to edit it. */
-  inner: vscode.Range;
-}
-
-/** Matches a %!notes directive line — mirrors MarkdownIncludeResolver's own regex, kept
- *  separate because that one carries /g state across calls. */
-const SLIDE_NOTES_DIRECTIVE_RE = /^[ \t]*%!notes[ \t]+(.+?)[ \t]*$/;
-
-/** Find every %!notes file a slide's raw source lines point to (a slide may have several).
- *  Must run on the un-resolved document text: %!notes is expanded into a `<!-- -->` comment
- *  before Marp/parseSpeakerNotes ever see it (see MarkdownIncludeResolver). */
-function findSlideNotesFiles(doc: vscode.TextDocument, startLine: number, endLine: number, baseDir: string): string[] {
-  const files: string[] = [];
-  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
-    const match = doc.lineAt(i).text.match(SLIDE_NOTES_DIRECTIVE_RE);
-    if (!match) { continue; }
-    const rawFile = match[1].trim();
-    files.push(path.isAbsolute(rawFile) ? rawFile : path.resolve(baseDir, rawFile));
-  }
-  return files;
-}
-
-interface SlideQuickPickItem extends vscode.QuickPickItem {
-  slideIndex: number;
-}
-
-/** Short preview text for a slide picker item: its first real content line, directives and
- *  notes stripped out. */
-function slideLabel(doc: vscode.TextDocument, startLine: number, endLine: number): string {
-  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
-    const text = doc.lineAt(i).text.trim();
-    if (!text || text === '---') { continue; }
-    if (text.startsWith('<!--') || text.startsWith('%!notes') || text.startsWith('%!include')) { continue; }
-    return text.replace(/^#+\s*/, '').slice(0, 60);
-  }
-  return '(empty slide)';
-}
-
-/** Let the user confirm or correct which slide to act on, with `preselect` highlighted.
- *  Returns undefined if the picker was dismissed. */
-function pickSlide(items: SlideQuickPickItem[], preselect: SlideQuickPickItem): Promise<SlideQuickPickItem | undefined> {
-  return new Promise(resolve => {
-    const qp = vscode.window.createQuickPick<SlideQuickPickItem>();
-    qp.items = items;
-    qp.activeItems = [preselect];
-    qp.placeholder = 'Pick the slide to edit speaker notes for';
-    qp.onDidAccept(() => { resolve(qp.selectedItems[0]); qp.hide(); });
-    qp.onDidHide(() => { resolve(undefined); qp.dispose(); });
-    qp.show();
-  });
-}
-
-/** Find the first speaker-note HTML comment within [startLine, endLine) of doc, skipping
- *  Marp directive comments (e.g. `<!-- _class: title -->`). Mirrors parseSpeakerNotes'
- *  detection rules but returns positions instead of text. */
-function findSlideNoteRange(doc: vscode.TextDocument, startLine: number, endLine: number): NoteCommentRange | undefined {
-  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
-    const lineText = doc.lineAt(i).text;
-
-    const singleMatch = lineText.match(/<!--\s*(.*?)\s*-->/);
-    if (singleMatch) {
-      const content = singleMatch[1] ?? '';
-      if (content && content.match(/^_?\w+\s*:/)) { continue; } // directive, not a note
-      const openCh = lineText.indexOf('<!--');
-      const closeCh = lineText.lastIndexOf('-->');
-      const innerStartCh = lineText.indexOf(content, openCh + 4);
-      return {
-        outer: new vscode.Range(i, openCh, i, closeCh + 3),
-        inner: new vscode.Range(i, innerStartCh, i, innerStartCh + content.length),
-      };
-    }
-
-    const startMatch = lineText.match(/<!--\s*(.*)$/);
-    if (startMatch && lineText.indexOf('-->') === -1) {
-      const openCh = lineText.indexOf('<!--');
-      for (let j = i + 1; j < endLine && j < doc.lineCount; j++) {
-        const closeCh = doc.lineAt(j).text.indexOf('-->');
-        if (closeCh >= 0) {
-          return {
-            outer: new vscode.Range(i, openCh, j, closeCh + 3),
-            inner: new vscode.Range(i, openCh + 4, j, closeCh),
-          };
-        }
-      }
-      return undefined; // unterminated comment; leave it alone
-    }
-  }
-  return undefined;
-}
+/** Per-slide edit links for the Notes panel, injected via tikz fence output */
+let cachedSlideNoteLinks: SlideNoteLink[][] = [];
+let slideNoteLinksInjected = false;
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -339,6 +165,11 @@ export function activate(context: vscode.ExtensionContext) {
       slideLinesInjected = true;
       const linesJson = JSON.stringify(cachedSlideLines).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
       signalHtml += `<div data-marp-slide-lines='${linesJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
+    }
+    if (!slideNoteLinksInjected && cachedSlideNoteLinks.length > 0) {
+      slideNoteLinksInjected = true;
+      const linksJson = JSON.stringify(cachedSlideNoteLinks).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
+      signalHtml += `<div data-marp-slide-note-links='${linksJson.replace(/'/g, '&#39;')}' style="display:none"></div>`;
     }
     return signalHtml;
   }
@@ -492,12 +323,16 @@ export function activate(context: vscode.ExtensionContext) {
         };
       };
 
-      /** Reset per-render state and extract speaker notes + slide line numbers from source */
-      const prepareRender = (src: string): void => {
+      /** Reset per-render state and extract speaker notes + slide line numbers from source.
+       *  `noteLinks` must come from the *raw* source (see computeSlideNoteLinks) since %!notes
+       *  is already gone by the time `src` reaches here. */
+      const prepareRender = (src: string, noteLinks: SlideNoteLink[][]): void => {
         notesInjected = false;
         slideLinesInjected = false;
+        slideNoteLinksInjected = false;
         cachedSlideNotes = parseSpeakerNotes(src);
         cachedSlideLines = parseSlideLineNumbers(src);
+        cachedSlideNoteLinks = noteLinks;
       };
 
       /**
@@ -507,10 +342,13 @@ export function activate(context: vscode.ExtensionContext) {
       const resolveAndPrepare = (src: string): string => {
         const doc = findMarkdownDocument();
         if (!doc) {
-          prepareRender(src);
+          prepareRender(src, []);
           return src;
         }
         const baseDir = path.dirname(doc.uri.fsPath);
+        // Computed from the raw (pre-resolve) source: %!notes directives are expanded into
+        // plain <!-- --> comments below, which would hide the very thing this looks for.
+        const noteLinks = computeSlideNoteLinks(src, path.basename(doc.uri.fsPath), baseDir);
         markdownIncludeResolver.clearTracked();
         let resolved = markdownIncludeResolver.resolve(src, baseDir);
         if (resolved !== src) { warnIfIncludeBreaksMarpTheme(src); }
@@ -518,7 +356,7 @@ export function activate(context: vscode.ExtensionContext) {
         // them after they change on disk instead of painting a cached copy.
         trackedImagePaths = collectLocalImagePaths(resolved, baseDir);
         resolved = bustImageCache(resolved, baseDir);
-        prepareRender(resolved);
+        prepareRender(resolved, noteLinks);
         // Update file watchers after parse completes (deferred to avoid re-entrancy)
         setTimeout(updateIncludeFileWatcher, 0);
         return resolved;
@@ -942,101 +780,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
 
       await exportMarp(doc, format, notes);
-    }),
-
-    // The preview's Speaker Notes panel is injected into VS Code's built-in Markdown
-    // preview webview, which gives it no way to message the extension back (its
-    // acquireVsCodeApi() is already claimed by the preview's own bootstrap script, and
-    // command: links aren't enabled for that webview). So "editing" the panel means
-    // jumping into the real source instead of a save button inside the panel itself.
-    vscode.commands.registerCommand('marpPlus.editSpeakerNotes', async () => {
-      const doc = findMarkdownDocument();
-      if (!doc) {
-        vscode.window.showWarningMessage('Open a Marp markdown file to edit its speaker notes.');
-        return;
-      }
-      const head = doc.getText().slice(0, 500);
-      if (!/^---[\s\S]*?marp:\s*true/m.test(head)) {
-        vscode.window.showWarningMessage('Speaker notes are only available for Marp decks (add "marp: true" to the frontmatter).');
-        return;
-      }
-
-      // There is no way to ask the built-in preview webview which slide is currently
-      // scrolled into view (no message channel back to the extension), and when the
-      // source editor isn't visible on screen there's no viewport/cursor signal either
-      // — so "current slide" can only ever be a guess. Always let the user confirm or
-      // correct it via a picker instead of silently acting on a possibly-wrong guess.
-      const sourceEditor = vscode.window.visibleTextEditors.find(e => e.document === doc);
-      const guessLine = sourceEditor?.visibleRanges[0]?.start.line ?? sourceEditor?.selection.active.line ?? 0;
-
-      const slideLines = parseSlideLineNumbers(doc.getText());
-      let guessIndex = 0;
-      for (let i = 0; i < slideLines.length; i++) {
-        if (slideLines[i] <= guessLine) { guessIndex = i; } else { break; }
-      }
-
-      let slideIndex = guessIndex;
-      if (slideLines.length > 1) {
-        const items: SlideQuickPickItem[] = slideLines.map((start, i) => {
-          const end = i + 1 < slideLines.length ? slideLines[i + 1] : doc.lineCount;
-          return { label: `Slide ${i + 1}: ${slideLabel(doc, start, end)}`, slideIndex: i };
-        });
-        const picked = await pickSlide(items, items[guessIndex]);
-        if (!picked) { return; }
-        slideIndex = picked.slideIndex;
-      }
-
-      const slideStart = slideLines[slideIndex];
-      const slideEnd = slideIndex + 1 < slideLines.length ? slideLines[slideIndex + 1] : doc.lineCount;
-
-      // A %!notes directive points the slide's notes at an external file — that file, not
-      // the deck, is what should open. A slide can have more than one.
-      const notesFiles = findSlideNotesFiles(doc, slideStart, slideEnd, path.dirname(doc.uri.fsPath));
-      if (notesFiles.length > 0) {
-        let target = notesFiles[0];
-        if (notesFiles.length > 1) {
-          const picked = await vscode.window.showQuickPick(
-            notesFiles.map(f => ({ label: path.basename(f), description: path.relative(path.dirname(doc.uri.fsPath), f), file: f })),
-            { placeHolder: 'This slide has multiple %!notes files — pick one to edit' }
-          );
-          if (!picked) { return; }
-          target = picked.file;
-        }
-        if (!fs.existsSync(target)) {
-          try {
-            fs.mkdirSync(path.dirname(target), { recursive: true });
-            fs.writeFileSync(target, '');
-          } catch {
-            vscode.window.showWarningMessage(`Could not create notes file: ${target}`);
-            return;
-          }
-        }
-        const notesDoc = await vscode.workspace.openTextDocument(target);
-        await vscode.window.showTextDocument(notesDoc, { preview: false });
-        return;
-      }
-
-      const editor = await vscode.window.showTextDocument(doc, { viewColumn: sourceEditor?.viewColumn });
-
-      let noteRange = findSlideNoteRange(doc, slideStart, slideEnd);
-      if (!noteRange) {
-        const insertAtEof = slideEnd >= doc.lineCount;
-        await editor.edit(editBuilder => {
-          if (insertAtEof) {
-            const lastLine = doc.lineAt(doc.lineCount - 1);
-            const prefix = lastLine.text.length > 0 ? '\n' : '';
-            editBuilder.insert(lastLine.range.end, `${prefix}<!--  -->\n`);
-          } else {
-            editBuilder.insert(new vscode.Position(slideEnd, 0), '<!--  -->\n');
-          }
-        });
-        noteRange = findSlideNoteRange(doc, slideStart, insertAtEof ? doc.lineCount : slideEnd + 1);
-      }
-
-      if (noteRange) {
-        editor.selection = new vscode.Selection(noteRange.inner.start, noteRange.inner.end);
-        editor.revealRange(noteRange.outer, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
-      }
     }),
 
     vscode.commands.registerCommand('marpPlus.toggleMarpPptxNotes', async () => {

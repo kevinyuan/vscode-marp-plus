@@ -246,9 +246,13 @@
             '  box-sizing: border-box; scrollbar-width: thin;',
             '}',
             '#marp-notes-header {',
+            '  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;',
             '  font-size: 11px; font-weight: bold; opacity: 0.5;',
             '  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;',
             '}',
+            '.marp-notes-edit-links { font-weight: normal; text-transform: none; letter-spacing: normal; white-space: nowrap; }',
+            '.marp-notes-edit-links a { color: inherit; text-decoration: none; }',
+            '.marp-notes-edit-links a:hover { text-decoration: underline; }',
             '#marp-notes-content { line-height: 1.6; }',
             '#marp-notes-content p { margin: 0 0 0.5em; }',
             '#marp-notes-content p:last-child { margin-bottom: 0; }',
@@ -495,6 +499,7 @@
         sb.dataset.slideCount = String(slideCount);
         sb.dataset.viewMode = viewMode;
         loadNotesData();
+        loadNoteLinks();
         loadSlideLineNumbers();
         injectDataLineMarkers(slides);
         rebuildContent();
@@ -755,6 +760,7 @@
     }
 
     var slideNotesData = []; // Populated from extension's injected JSON
+    var slideNoteLinksData = []; // Populated from extension's injected JSON
 
     /** Load speaker notes from data attribute injected by extension */
     function loadNotesData() {
@@ -764,6 +770,18 @@
             slideNotesData = JSON.parse(el.getAttribute('data-marp-slide-notes'));
         } catch (e) {
             slideNotesData = [];
+        }
+    }
+
+    /** Load per-slide "edit notes" links (deck line anchor or %!notes file paths) from the
+     *  data attribute injected by the extension. */
+    function loadNoteLinks() {
+        var el = document.querySelector('[data-marp-slide-note-links]');
+        if (!el) { return; }
+        try {
+            slideNoteLinksData = JSON.parse(el.getAttribute('data-marp-slide-note-links'));
+        } catch (e) {
+            slideNoteLinksData = [];
         }
     }
 
@@ -904,9 +922,28 @@
     function updateNotesContent() {
         if (!notesPanel || !notesVisible) { return; }
         if (slideNotesData.length === 0) { loadNotesData(); }
+        if (slideNoteLinksData.length === 0) { loadNoteLinks(); }
         var header = notesPanel.querySelector('#marp-notes-header');
         var content = notesPanel.querySelector('#marp-notes-content');
-        if (header) { header.textContent = 'Speaker Notes \u2014 Slide ' + (currentSlideIdx + 1); }
+        if (header) {
+            header.innerHTML = '';
+            var title = document.createElement('span');
+            title.textContent = 'Speaker Notes \u2014 Slide ' + (currentSlideIdx + 1);
+            header.appendChild(title);
+            var noteLinks = slideNoteLinksData[currentSlideIdx] || [];
+            if (noteLinks.length > 0) {
+                var linksEl = document.createElement('span');
+                linksEl.className = 'marp-notes-edit-links';
+                for (var li = 0; li < noteLinks.length; li++) {
+                    if (li > 0) { linksEl.appendChild(document.createTextNode(' \u00b7 ')); }
+                    var a = document.createElement('a');
+                    a.setAttribute('href', noteLinks[li].href);
+                    a.textContent = '\u270e ' + noteLinks[li].label;
+                    linksEl.appendChild(a);
+                }
+                header.appendChild(linksEl);
+            }
+        }
         if (!content) { return; }
         var rawNote = slideNotesData[currentSlideIdx] || '';
         if (!rawNote) {
