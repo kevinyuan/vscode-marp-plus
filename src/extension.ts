@@ -586,6 +586,20 @@ let includeWatchDebounce: NodeJS.Timeout | undefined;
  */
 let watchedDeckDocument: vscode.TextDocument | undefined;
 
+/**
+ * True when doc is a known dependency of the previewed deck (a %!notes file, an included
+ * tikz/md/yaml file, or a local image opened as text) rather than the deck itself. Editors
+ * that track "the current markdown document" (lastMarkdownDocument, marpPlus.isMarpFile) must
+ * skip these: opening a dependency — e.g. a %!notes file via its new Notes-panel link — makes
+ * IT the active/changed document, which would otherwise hijack that tracking away from the
+ * deck that's actually being previewed and, on switching back to the preview, leave it
+ * rendering/reporting on the wrong file (blank notes, no Marp theme, forceRefresh doing
+ * nothing) until a full window reload resets the state.
+ */
+function isTrackedDependency(doc: vscode.TextDocument): boolean {
+  return watchedIncludePaths.has(doc.uri.fsPath);
+}
+
 /** Local image files referenced by the last previewed source (absolute paths). */
 let trackedImagePaths = new Set<string>();
 
@@ -861,6 +875,7 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
   // Track active markdown document
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor && isTrackedDependency(editor.document)) { return; } // keep tracking the deck
       if (editor && editor.document.languageId === 'markdown') {
         lastMarkdownDocument = editor.document;
       }
@@ -882,6 +897,10 @@ function registerEventHandlers(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument((event) => {
       if (event.document.languageId !== 'markdown' || !previewManager) { return; }
+      // A dependency's own edits don't need a live preview of themselves — only a save does
+      // (handled below, and via fs.watch for non-markdown dependencies) — and treating them as
+      // "the document" here would hijack tracking away from the deck that depends on them.
+      if (isTrackedDependency(event.document)) { return; }
       lastMarkdownDocument = event.document;
       updateMarpContext(event.document);
       if (debounceTimer) { clearTimeout(debounceTimer); }
