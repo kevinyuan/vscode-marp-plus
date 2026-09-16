@@ -932,7 +932,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
 
       const sourceEditor = vscode.window.visibleTextEditors.find(e => e.document === doc);
-      const cursorLine = sourceEditor?.selection.active.line ?? 0;
+      // Preview<->editor scroll sync only reveals a range in the editor, it never moves the
+      // cursor, so browsing slides via the preview leaves selection.active stuck wherever the
+      // user last actually clicked/typed in the source. The visible viewport tracks scroll
+      // sync, so it reflects "the slide currently in view" much more reliably.
+      const cursorLine = sourceEditor?.visibleRanges[0]?.start.line
+        ?? sourceEditor?.selection.active.line
+        ?? 0;
 
       const slideLines = parseSlideLineNumbers(doc.getText());
       let slideIndex = 0;
