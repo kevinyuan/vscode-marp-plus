@@ -160,6 +160,36 @@ function findSlideNotesFiles(doc: vscode.TextDocument, startLine: number, endLin
   return files;
 }
 
+interface SlideQuickPickItem extends vscode.QuickPickItem {
+  slideIndex: number;
+}
+
+/** Short preview text for a slide picker item: its first real content line, directives and
+ *  notes stripped out. */
+function slideLabel(doc: vscode.TextDocument, startLine: number, endLine: number): string {
+  for (let i = startLine; i < endLine && i < doc.lineCount; i++) {
+    const text = doc.lineAt(i).text.trim();
+    if (!text || text === '---') { continue; }
+    if (text.startsWith('<!--') || text.startsWith('%!notes') || text.startsWith('%!include')) { continue; }
+    return text.replace(/^#+\s*/, '').slice(0, 60);
+  }
+  return '(empty slide)';
+}
+
+/** Let the user confirm or correct which slide to act on, with `preselect` highlighted.
+ *  Returns undefined if the picker was dismissed. */
+function pickSlide(items: SlideQuickPickItem[], preselect: SlideQuickPickItem): Promise<SlideQuickPickItem | undefined> {
+  return new Promise(resolve => {
+    const qp = vscode.window.createQuickPick<SlideQuickPickItem>();
+    qp.items = items;
+    qp.activeItems = [preselect];
+    qp.placeholder = 'Pick the slide to edit speaker notes for';
+    qp.onDidAccept(() => { resolve(qp.selectedItems[0]); qp.hide(); });
+    qp.onDidHide(() => { resolve(undefined); qp.dispose(); });
+    qp.show();
+  });
+}
+
 /** Find the first speaker-note HTML comment within [startLine, endLine) of doc, skipping
  *  Marp directive comments (e.g. `<!-- _class: title -->`). Mirrors parseSpeakerNotes'
  *  detection rules but returns positions instead of text. */
@@ -931,20 +961,31 @@ function registerCommands(context: vscode.ExtensionContext): void {
         return;
       }
 
+      // There is no way to ask the built-in preview webview which slide is currently
+      // scrolled into view (no message channel back to the extension), and when the
+      // source editor isn't visible on screen there's no viewport/cursor signal either
+      // — so "current slide" can only ever be a guess. Always let the user confirm or
+      // correct it via a picker instead of silently acting on a possibly-wrong guess.
       const sourceEditor = vscode.window.visibleTextEditors.find(e => e.document === doc);
-      // Preview<->editor scroll sync only reveals a range in the editor, it never moves the
-      // cursor, so browsing slides via the preview leaves selection.active stuck wherever the
-      // user last actually clicked/typed in the source. The visible viewport tracks scroll
-      // sync, so it reflects "the slide currently in view" much more reliably.
-      const cursorLine = sourceEditor?.visibleRanges[0]?.start.line
-        ?? sourceEditor?.selection.active.line
-        ?? 0;
+      const guessLine = sourceEditor?.visibleRanges[0]?.start.line ?? sourceEditor?.selection.active.line ?? 0;
 
       const slideLines = parseSlideLineNumbers(doc.getText());
-      let slideIndex = 0;
+      let guessIndex = 0;
       for (let i = 0; i < slideLines.length; i++) {
-        if (slideLines[i] <= cursorLine) { slideIndex = i; } else { break; }
+        if (slideLines[i] <= guessLine) { guessIndex = i; } else { break; }
       }
+
+      let slideIndex = guessIndex;
+      if (slideLines.length > 1) {
+        const items: SlideQuickPickItem[] = slideLines.map((start, i) => {
+          const end = i + 1 < slideLines.length ? slideLines[i + 1] : doc.lineCount;
+          return { label: `Slide ${i + 1}: ${slideLabel(doc, start, end)}`, slideIndex: i };
+        });
+        const picked = await pickSlide(items, items[guessIndex]);
+        if (!picked) { return; }
+        slideIndex = picked.slideIndex;
+      }
+
       const slideStart = slideLines[slideIndex];
       const slideEnd = slideIndex + 1 < slideLines.length ? slideLines[slideIndex + 1] : doc.lineCount;
 
