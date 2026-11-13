@@ -21,8 +21,17 @@ import * as zlib from 'zlib';
 export const MIN_RUN_LENGTH = 12;
 /** A real gradient steps through several colours; a run of identical fills is not one. */
 export const MIN_DISTINCT_COLORS = 4;
-/** Longest side of the generated bitmap, in pixels. */
-const MAX_RASTER_SIDE = 1280;
+/** Longest side of a generated bitmap, in pixels (after downsampling). */
+const MAX_RASTER_SIDE = 2048;
+/** Bitmap pixels per slide pixel (1 slide px = 9525 EMU) before the side cap applies. */
+const TARGET_DENSITY = 2;
+/** Supersampling factor for edge anti-aliasing (render N× then box-filter down). */
+const SUPERSAMPLE = 2;
+/** Bitmaps larger than this many final pixels skip supersampling: they are already dense, and
+ *  a 4096-px internal buffer per effect made a 30-slide deck take minutes. */
+const SUPERSAMPLE_MAX_PIXELS = 400_000;
+/** Slivers whose bounding boxes lie within this many EMU belong to the same effect. */
+const ADJACENCY_EMU = 2000;
 
 interface Sliver {
   /** Offset into the slide XML where this <p:sp> starts / ends. */
@@ -106,13 +115,43 @@ function parsePath(xml: string): number[][][] | null {
   return polys.length > 0 ? polys : null;
 }
 
-/** Group consecutive slivers (nothing but whitespace between them) into runs. */
+/** Split slivers into spatially connected groups (touching/overlapping bounding boxes). */
+function connectedGroups(slivers: Sliver[]): Sliver[][] {
+  const parent = slivers.map((_, i) => i);
+  const find = (i: number): number => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const order = slivers.map((_, i) => i).sort((a, b) => slivers[a].x - slivers[b].x);
+  for (let oi = 0; oi < order.length; oi++) {
+    const a = slivers[order[oi]];
+    for (let oj = oi + 1; oj < order.length; oj++) {
+      const b = slivers[order[oj]];
+      if (b.x > a.x + a.w + ADJACENCY_EMU) { break; }
+      if (b.y <= a.y + a.h + ADJACENCY_EMU && a.y <= b.y + b.h + ADJACENCY_EMU) {
+        parent[find(order[oj])] = find(order[oi]);
+      }
+    }
+  }
+  const groups = new Map<number, Sliver[]>();
+  slivers.forEach((s, i) => { const r = find(i); (groups.get(r) ?? groups.set(r, []).get(r)!).push(s); });
+  return [...groups.values()];
+}
+
+const isGradient = (g: Sliver[]) =>
+  g.length >= MIN_RUN_LENGTH && new Set(g.map(s => s.rgb.join(','))).size >= MIN_DISTINCT_COLORS;
+
+/**
+ * Find gradient effects: runs of consecutive slivers (nothing but whitespace
+ * between them), split into spatially separate groups so unrelated effects
+ * and solid decorations are not merged into one bitmap. Each group is in
+ * z-order.
+ */
 function findRuns(xml: string): Sliver[][] {
   const runs: Sliver[][] = [];
   let run: Sliver[] = [];
   const close = () => {
-    if (run.length >= MIN_RUN_LENGTH && new Set(run.map(s => s.rgb.join(','))).size >= MIN_DISTINCT_COLORS) {
-      runs.push(run);
+    if (run.length >= MIN_RUN_LENGTH) {
+      for (const g of connectedGroups(run)) {
+        if (isGradient(g)) { runs.push(g.sort((a, b) => a.start - b.start)); }
+      }
     }
     run = [];
   };
@@ -179,12 +218,15 @@ function rasterizeRun(run: Sliver[]): RasterResult | null {
   const x1 = Math.max(...run.map(s => s.x + s.w)), y1 = Math.max(...run.map(s => s.y + s.h));
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0) { return null; }
-  const pxPerEmu = MAX_RASTER_SIDE / Math.max(w, h);
-  const W = Math.max(1, Math.round(w * pxPerEmu)), H = Math.max(1, Math.round(h * pxPerEmu));
+  // Final bitmap size: TARGET_DENSITY px per slide px, capped; internal buffer is SUPERSAMPLE× larger.
+  const finalPerEmu = Math.min(TARGET_DENSITY / 9525, MAX_RASTER_SIDE / Math.max(w, h));
+  const fw = Math.max(1, Math.round(w * finalPerEmu)), fh = Math.max(1, Math.round(h * finalPerEmu));
+  const ss = fw * fh <= SUPERSAMPLE_MAX_PIXELS ? SUPERSAMPLE : 1;
+  const W = fw * ss, H = fh * ss;
   const rgba = new Uint8Array(W * H * 4);
 
   for (const s of run) {
-    // local path units → raster pixels
+    // local path units → internal raster pixels
     const sx = (s.w / s.pathW) * (W / w), sy = (s.h / s.pathH) * (H / h);
     const ox = (s.x - x0) * (W / w), oy = (s.y - y0) * (H / h);
     const tx = (px: number) => (s.flipH ? s.pathW - px : px) * sx + ox;
@@ -229,7 +271,30 @@ function rasterizeRun(run: Sliver[]): RasterResult | null {
       }
     }
   }
-  return { png: encodePng(rgba, W, H), x: x0, y: y0, w, h };
+  return { png: encodePng(ss > 1 ? downsample(rgba, W, H, ss) : rgba, fw, fh), x: x0, y: y0, w, h };
+}
+
+/** Alpha-weighted box filter: shrink by an integer factor without dark/light fringes at edges. */
+function downsample(src: Uint8Array, W: number, H: number, f: number): Uint8Array {
+  const fw = W / f, fh = H / f;
+  const out = new Uint8Array(fw * fh * 4);
+  const n = f * f;
+  for (let y = 0; y < fh; y++) {
+    for (let x = 0; x < fw; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      for (let dy = 0; dy < f; dy++) {
+        for (let dx = 0; dx < f; dx++) {
+          const o = ((y * f + dy) * W + (x * f + dx)) * 4;
+          const al = src[o + 3];
+          r += src[o] * al; g += src[o + 1] * al; b += src[o + 2] * al; a += al;
+        }
+      }
+      const o = (y * fw + x) * 4;
+      if (a > 0) { out[o] = Math.round(r / a); out[o + 1] = Math.round(g / a); out[o + 2] = Math.round(b / a); }
+      out[o + 3] = Math.round(a / n);
+    }
+  }
+  return out;
 }
 
 // ── Slide-level transform ───────────────────────────────────────────────────
@@ -253,13 +318,11 @@ export function collapseGradientRuns(xml: string): CollapseResult {
   for (const m of xml.matchAll(/<p:cNvPr\s+id="(\d+)"/g)) { maxId = Math.max(maxId, +m[1]); }
 
   const images: CollapseResult['images'] = [];
+  const edits: Array<{ start: number; end: number; text: string }> = [];
   let collapsed = 0;
-  let out = xml;
-  // Work back-to-front so earlier offsets stay valid.
-  for (let r = runs.length - 1; r >= 0; r--) {
-    const run = runs[r];
+  runs.forEach((run, r) => {
     const ras = rasterizeRun(run);
-    if (!ras) { continue; }
+    if (!ras) { return; }
     const placeholder = `__FXRID_${r}__`;
     const id = ++maxId;
     const pic =
@@ -268,10 +331,17 @@ export function collapseGradientRuns(xml: string): CollapseResult {
       `<p:blipFill><a:blip r:embed="${placeholder}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
       `<p:spPr><a:xfrm><a:off x="${ras.x}" y="${ras.y}"/><a:ext cx="${ras.w}" cy="${ras.h}"/></a:xfrm>` +
       `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
-    out = out.slice(0, run[0].start) + pic + out.slice(run[run.length - 1].end);
-    images.unshift({ placeholder, png: ras.png });
+    run.forEach((s, i) => edits.push({ start: s.start, end: s.end, text: i === 0 ? pic : '' }));
+    images.push({ placeholder, png: ras.png });
     collapsed += run.length;
-  }
+  });
+  // Single forward pass: per-edit slice() on a multi-MB string is quadratic with tens of thousands of slivers.
+  edits.sort((a, b) => a.start - b.start);
+  const parts: string[] = [];
+  let pos = 0;
+  for (const e of edits) { parts.push(xml.slice(pos, e.start), e.text); pos = e.end; }
+  parts.push(xml.slice(pos));
+  const out = parts.join('');
   return { xml: out, images, collapsedShapes: collapsed };
 }
 
