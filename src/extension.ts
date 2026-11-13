@@ -11,6 +11,7 @@ import { generateHash } from './utils/hash';
 import { extractAndReplaceMath, ExtractedMath } from './utils/mathPreprocessor';
 import { latexToOmml } from './utils/mathToOmml';
 import { injectMarpCjkFont } from './utils/marpCjkFont';
+import { prerenderGradients } from './utils/gradientPrerender';
 import { collapseGradientsInZip } from './utils/pptxGradientCollapse';
 import { injectPrintColorAdjust } from './utils/marpPrintColorAdjust';
 import { MarkdownIncludeResolver } from './utils/markdownPreprocessor';
@@ -1276,6 +1277,19 @@ async function exportMarp(doc: vscode.TextDocument, exportFormat: 'pptx' | 'pdf'
         // (background color, gradient underlines, glow effects) even though
         // they show correctly in the live preview.
         md = injectPrintColorAdjust(md);
+
+        // Editable PPTX goes Chromium PDF → LibreOffice, which tessellates PDF gradients into
+        // thousands of tiny shapes. Hand Chromium finished bitmaps instead so the PDF (and the
+        // PPTX) hold one picture per gradient. Unsupported gradients are left as-is and handled
+        // by the post-export sliver collapse.
+        if (isPptxEditable) {
+          const g = prerenderGradients(md);
+          md = g.md;
+          if (g.replaced + g.skipped > 0) {
+            outputChannel.appendLine(`[marp-export] Pre-rendered ${g.replaced} CSS gradient(s) to bitmaps` +
+              (g.skipped > 0 ? ` (${g.skipped} left as-is)` : ''));
+          }
+        }
 
         // Write processed markdown to its (pre-computed, hidden) path.
         fs.writeFileSync(processedMdPath, md, 'utf-8');
