@@ -11,6 +11,7 @@ import { generateHash } from './utils/hash';
 import { extractAndReplaceMath, ExtractedMath } from './utils/mathPreprocessor';
 import { latexToOmml } from './utils/mathToOmml';
 import { injectMarpCjkFont } from './utils/marpCjkFont';
+import { collapseGradientsInZip } from './utils/pptxGradientCollapse';
 import { injectPrintColorAdjust } from './utils/marpPrintColorAdjust';
 import { MarkdownIncludeResolver } from './utils/markdownPreprocessor';
 import { bustImageCache, collectLocalImagePaths } from './utils/imageCacheBuster';
@@ -1455,6 +1456,13 @@ async function fixPptxOverlays(pptxPath: string): Promise<void> {
       zip.file(filename, xml);
       modified = true;
     }
+  }
+
+  // Gradients/glows arrive from LibreOffice as thousands of sliver shapes; fold each run into one picture.
+  const collapsed = await collapseGradientsInZip(zip);
+  if (collapsed > 0) {
+    outputChannel.appendLine(`[marp-export] Collapsed ${collapsed} gradient sliver shape(s) into pictures`);
+    modified = true;
   }
 
   if (modified) {
